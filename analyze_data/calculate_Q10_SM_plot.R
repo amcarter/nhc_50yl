@@ -1,7 +1,8 @@
 # calculate Q10 for NHC sites from SM metabolism estimates
 dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer.rds")
 
-met <- dat$preds
+met <- dat$preds %>%
+  mutate(NEP = -(GPP + ER))
 
 calc_q10 <- function(met) {
   if(!("r1" %in% colnames(met))){
@@ -33,10 +34,10 @@ calc_q10 <- function(met) {
              summary(m)$r.squared)
   names(q10_lm) <- c("lower", "median","upper", "r2")
   
-  # ggplot(qqq, aes(deltaT, log(rr))) +
-  #   geom_point() +
-  #   geom_smooth(method = lm)
-  # 
+  p<- ggplot(qqq, aes(deltaT, log(rr))) +
+    geom_point() +
+    geom_smooth(method = lm)
+
   tmp <- mm %>% 
     mutate(rb = median(r1, na.rm = T),
            tb = median(t1, na.rm = T),
@@ -47,12 +48,14 @@ calc_q10 <- function(met) {
   met <- left_join(met, tmp, by = "date")
 
   return(list(met = met,
-              q10 = q10_lm))
+              q10 = q10_lm,
+              p = p))
   
 }
 
 
 # calc Q10 by site by month
+
 met <- dat$preds %>%
   mutate(NEP = -(GPP + ER))
 q10_all <- data.frame()
@@ -64,11 +67,14 @@ for(s in unique(sites$sitecode)) {
   smet <- filter(met, site == s)
   for(y in unique(smet$year)){
     ymet <- filter(smet, year == y)
+    # mm <- filter(smet, year == y)
     for(m in 1:12){
       mm <- filter(ymet, month == m)
-      n <- length(which(mm$NEP > 0))
+      mm$r1 <- -mm$ER
+      n <- length(which(mm$r1 > 0))
       if(n < 5) {next}
       qmod <- calc_q10(mm) 
+      print(p + ggtitle(paste(s, y, m, sep = " ")))
       q10 = data.frame(site = s,
                        year = y,
                        month = m,
@@ -81,7 +87,6 @@ for(s in unique(sites$sitecode)) {
       q10_all <- bind_rows(q10_all, q10)
       qmod$met <- left_join(qmod$met, q10, by = c("site", "year", "month"))
       met_rmod <- bind_rows(met_rmod, qmod$met)
-      # plot_resp_mod(qmod$met)
     }
   }
 }
@@ -95,18 +100,22 @@ write_csv(met, "data/metabolism/Q10vNEP_all_sites_SM.csv")
 
 # png("figures/all_sites_q10_modeled_NEP.png", width = 4, height = 4,
 #     res = 300, units = 'in')
-#   ggplot(met, aes(NEP, r_mod)) + 
-#     geom_point(size = 1.5) +
-#     geom_errorbar(aes(ymin = r_mod_lower, ymax = r_mod_upper), width = 0) +
-#     geom_abline(intercept = 0, slope = 1, lty = 2, col = "brown3") +
-#     xlab("respiration (gC/m2/d)") +
-#     ylab("Q10 based modeled respiration") +
-#     labs(title = "All sites based on monthly Q10")
+  ggplot(met, aes(-ER, r_mod, col = factor(year))) +
+    geom_point(size = 1.5) +
+    geom_errorbar(aes(ymin = r_mod_lower, ymax = r_mod_upper), width = 0) +
+    geom_abline(intercept = 0, slope = 1, lty = 2, col = "brown3") +
+    facet_wrap(~site)+
+    xlab("respiration (gC/m2/d)") +
+    ylab("Q10 based modeled respiration") +
+    labs(title = "All sites based on monthly Q10")
+  
+  ggplot(met, aes(month, q10, color = factor(year))) + 
+    geom_point() +
+    facet_wrap(~site)
 # dev.off()  
-  # facet_wrap(year~site)
-    # labs(title = paste(met$site[1], met$year[1], month.abb[met$month[1]],
-    #       "  Q10 = ", round(mean(met$q10, na.rm = T), 1),
-    #       "  r2 = ", round(met$r2[1], 3)))
+  labs(title = paste(met$site[1], met$year[1], month.abb[met$month[1]],
+        "  Q10 = ", round(mean(met$q10, na.rm = T), 1),
+        "  r2 = ", round(met$r2[1], 3)))
 
 nhc <- met %>%
   filter(site %in% c('NHC', 'UNHC')) %>%

@@ -261,8 +261,8 @@ plot_KvER <- function(preds){
 }
 
 
-plot_metab <- function(met, ylim = NULL, xlim = NULL, doy = F, main = "", error = T, 
-                       xaxt = NULL, yaxt = NULL){
+plot_metab <- function(met, ylim = NULL, xlim = NULL, doy = F, main = "", 
+                       error = T, xaxt = NULL, yaxt = NULL){
 
   if(error){
     yrange = range(c(met$GPP.upper, met$ER.lower), na.rm = T)
@@ -286,7 +286,7 @@ plot_metab <- function(met, ylim = NULL, xlim = NULL, doy = F, main = "", error 
         lwd = 2, col = "sienna")
   if(error){
     polygon(na.approx(c(met$date, rev(met$date)), na.rm = F), 
-            na.approx(c(met$GPP.lower, rev(met$GPP.upper)), na.rm = F),
+            na.approx(c(met$GPP.upper, rev(met$GPP.lower)), na.rm = F),
             col = alpha("forestgreen", 0.4), border = NA)
     polygon(na.approx(c(met$date, rev(met$date)), na.rm = F), 
             na.approx(c(met$ER.lower, rev(met$ER.upper)), na.rm = F),
