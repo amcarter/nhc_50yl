@@ -4,7 +4,25 @@ dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer.rds")
 
 met <- dat$preds 
 
+dd <- tibble()
+for(s in sites$sitecode){
+  d <- read_csv(paste0('data/metabolism/processed/', s, '.csv'), guess_max = 10000) %>%
+  select(DateTime_UTC, site, depth, avg_velocity, light)
+  dd <- bind_rows(dd, d)
+}
 
+d <- dd %>%
+  mutate(DateTime_EST = with_tz(DateTime_UTC, 'EST'), 
+         date = as.Date(DateTime_EST, tz = 'EST')) %>%
+  group_by(site, date) %>%
+  summarize(across(any_of(c('depth', 'avg_velocity', 'light')), mean, na.rm = T))
+met <- met %>%
+  rename(depth_hall = depth) %>%
+  left_join( d, by = c('site', 'date')) %>%
+  mutate(case_when(is.na(depth) ~ depth_hall,
+                   TRUE ~ depth)) %>%
+  select(-depth_hall)
+                 
 # subset out modern dataset to build model
 mm <- met %>%
   filter(era == 'now') %>%
@@ -14,6 +32,9 @@ mm <- met %>%
 ggplot(mm, aes(date, ER, col = year)) +
   geom_point()
 
+ggplot(mm, aes(site, (K600)))+
+  geom_boxplot() #+ facet_wrap(~year)
+
 ggplot(mm, aes(temp.water, ER, col = factor(month)))+
   geom_point() + geom_smooth(method = lm) +
   facet_wrap(~site)
@@ -21,9 +42,13 @@ ggplot(mm, aes(temp.water, ER, col = factor(month)))+
 # subset to fall respiration data and add in annual flow values
 
 yy <- mm %>%
-  group_by(year) %>%
-  summarize(logQ_mean = mean(logQ, na.rm = T)) %>%
-  ungroup() 
+  group_by(year, site) %>%
+  summarize(logQ_mean = mean(logQ, na.rm = T),
+            depth_mean = mean(depth, na.rm = T)) %>%
+  ungroup() %>%
+  rename(sitecode = site) %>%
+  left_join(sites, by = 'sitecode') %>%
+  select(site = sitecode, year, logQ_mean, depth_mean, distance_m, slope)
 
 fall <- mm %>%
   filter(month %in% c(10,11)) %>%
@@ -40,12 +65,12 @@ sfall <- fall %>%
                 .fns = scale))
 # model for ER ####
 
-mER = lmer(ER ~ temp.water + (temp.water|logQ_mean) + (temp.water|site), 
+mER = lmer(ER ~ temp.water + (temp.water|site.x) + (temp.water|logQ_mean), 
            data = sfall)
 summary(mER)$coeff
 confint(mER)
-
 ranef(mER)
+
 ER_mod <- predict(mER) 
 tmp <- data.frame(index = as.numeric(names(ER_mod)), ER_mod = ER_mod)
 sfall <- sfall %>%

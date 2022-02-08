@@ -17,7 +17,7 @@ setwd('C:/Users/Alice Carter/git/nhc_50yl/')
 # } 
 
 # read in corrected level data:
-lvl_long <- read_csv("data/rating_curves/all_sites_level_corrected.csv") %>%
+lvl_long <- read_csv("data/rating_curves/all_sites_level_corrected2.csv") %>%
   group_by(site, DateTime_UTC) %>%
   summarize_all(mean, na.rm = T) %>%
   ungroup()
@@ -55,11 +55,11 @@ lvl_s$unhc_mod <- predict(munhc, newdata = lvl_s)
 #                            is.na(level_unhc) ~ "unhc modeled"))
 qm <- lvl_s %>%
   mutate(UNHC = c(lvl_s$UNHC[9:n], rep(NA_real_, 8)),
-         unhc_mod = c(lvl_s$unhc_mod[9:n], rep(NA_real_, 8)),
-         NHC = case_when(((DateTime_UTC > ymd_hms('2017-10-15 00:00:00') &
-                            DateTime_UTC < ymd_hms("2018-01-24 23:15:00"))) ~
-                            NA_real_,
-                          TRUE ~ NHC)) %>%
+         unhc_mod = c(lvl_s$unhc_mod[9:n], rep(NA_real_, 8)))%>%
+         # NHC = case_when(((DateTime_UTC > ymd_hms('2017-10-15 00:00:00') &
+         #                    DateTime_UTC < ymd_hms("2018-01-24 23:15:00"))) ~
+         #                    NA_real_,
+         #                  TRUE ~ NHC)) %>%
   rename(level_nhc = NHC, level_unhc = UNHC) %>%
   mutate(nhc_mod = ifelse(is.na(level_nhc), nhc_mod, level_nhc),
          unhc_mod = ifelse(is.na(level_unhc), unhc_mod, level_unhc),
@@ -139,12 +139,12 @@ for(i in 1:nrow(unhc_gaps)){
 
 # double check that everything looks okay
 # par(mfrow = c(1,1))
-# plot(qm$DateTime_UTC, qm$nhc_mod, log="y", main = "NHC", pch = 20)
-# points(qm$DateTime_UTC[qm$notes == "nhc modeled"],
-#        qm$nhc_mod[qm$notes=="nhc modeled"], pch = 20, col = "red")
-# plot(qm$DateTime_UTC, qm$unhc_mod, log="y", main = "UNHC", pch = 20)
-# points(qm$DateTime_UTC[qm$notes == "unhc modeled"],
-#        qm$unhc_mod[qm$notes=="unhc modeled"], pch = 20, col = "red")
+plot(qm$DateTime_UTC, qm$nhc_mod, log="y", main = "NHC", pch = 20)
+points(qm$DateTime_UTC[qm$notes == "nhc modeled"],
+       qm$nhc_mod[qm$notes=="nhc modeled"], pch = 20, col = "red")
+plot(qm$DateTime_UTC, qm$unhc_mod, log="y", main = "UNHC", pch = 20)
+points(qm$DateTime_UTC[qm$notes == "unhc modeled"],
+       qm$unhc_mod[qm$notes=="unhc modeled"], pch = 20, col = "red")
 
 qm_l <- qm %>%
   select(DateTime_UTC, NHC = nhc_mod, UNHC = unhc_mod, notes) %>%
@@ -153,7 +153,7 @@ qm_l <- qm %>%
 lvl_long<- lvl_long %>%
   filter(!(site %in% c("NHC", "UNHC"))) %>%
   bind_rows(qm_l)
-write_csv(lvl_long, "data/rating_curves/all_sites_level_corrected.csv")
+write_csv(lvl_long, "data/rating_curves/all_sites_level_corrected2.csv")
 
 nhc <- read_csv("data/metabolism/corrected_level/NHC_lvl.csv", 
                 guess_max = 10000) %>%

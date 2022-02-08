@@ -152,10 +152,12 @@ setwd('C:/Users/Alice Carter/git/nhc_50yl/')
 # m_diff = 0.04436296 
 
 qql <- read_csv("data/rating_curves/calculated_discharge_with_levels.csv")
-levels <- read_csv("data/rating_curves/all_sites_level_corrected.csv",
+levels <- read_csv("data/rating_curves/all_sites_level_corrected2.csv",
                    guess_max = 1000000) #%>%
   # mutate(level_m = case_when(site == "UNHC" ~ level_m - m_diff,
   #                            TRUE ~ level_m))
+# left_join(qql, levels, by = c('site', 'DateTime_UTC')) %>% filter(site %in% c('NHC', 'UNHC')) %>%
+#   ggplot(aes(level_m, level)) + geom_point() + facet_wrap(~site) +geom_abline(slope = 1, intercept = 0)
 # write_csv(levels, "NHC_2019_metabolism/data/rating_curves/all_sites_level_corrected.csv")
 
 # unhc <- read_csv("NHC_2019_metabolism/data/metabolism/corrected_level/UNHC_lvl.csv") %>%
@@ -184,14 +186,14 @@ nhc <- qql %>%
 # nhc <- data.frame(stage_m = .64, discharge = 0.005) %>% bind_rows(nhc)
 unhc <- qql %>%
   filter(site =="UNHC") %>%
-  slice(c( -3, -2))
+  slice(c(-2, -3))
 # unhc$discharge[1]<- c(.001)
 # unhc <- data.frame(stage_m = .35, discharge = 0.01) %>% bind_rows(unhc)
 # 
 # m <- lm(log(discharge)~log(stage_m), data = nhc)
 # m_coef <- summary(m)$coefficients[,1]
 # 
-# # What does this curve predict at 0.62 stage?
+# What does this curve predict at 0.62 stage?
 # plot(nhc$stage_m, nhc$discharge, xlim = c(.5, 1.5), ylim = c(0,2))
 # lines(seq(0,2, by = .01), exp(m_coef[1]) * seq(0,2, by = .01) ^ m_coef[2], col = 2)
 # med <- median(levels$NHC, na.rm = T)
@@ -213,7 +215,7 @@ unhc <- qql %>%
 # 
 # par(new = T)
 # plot(density((levels$UNHC), na.rm = T), col = 3, xlim = c(.2, .8), axes = F)
-# # med_diff <- u_med-med
+# med_diff <- u_med-med
 
 build_powerlaw_rc <- function(l, q, site){
   m <- lm(log(q)~log(l))
@@ -237,10 +239,18 @@ ZQdat$min_Q = 0
 ZQdat$min_l = 0.64
 ZQdat <- bind_rows(ZQdat, build_powerlaw_rc(unhc$stage_m, unhc$discharge, "UNHC"))
 
-
+png('figures/ratingcurves.png', width = 480, height = 300)
+par(mfrow =  c(1,2))
+plot(nhc$stage_m, nhc$discharge, xlim = c(0.5, 1.5), main = "NHC",
+     ylab = 'discharge m3/s', xlab = 'stage m')
+curve(exp(ZQdat$a[1])*x^ZQdat$b[1], add = T )
+plot(unhc$stage_m, unhc$discharge, xlim = c(0.3, 1), main = "UNHC",
+     ylab = 'discharge m3/s', xlab = 'stage m')
+curve(exp(ZQdat$a[2])*x^ZQdat$b[2], add = T )
+dev.off()
 # Calculate discharge from rating curves ####
 # Q = a * level ^ b
-# ZQdat_sp <- read_csv(file="siteData/NC_streampulseZQ_data.csv")
+# ZQdat_sp <- read_csv(file="data/siteData/NC_streampulseZQ_data.csv")
 # ZQdat <- read_csv("NHC_2019_metabolism/data/rating_curves/modified_ZQ_curves.csv")
 qq <- levels %>%
   # filter(DateTime_UTC <= ymd_hms("2020-03-02 00:00:00"))%>%
@@ -273,7 +283,7 @@ ZQdat <- data.frame(site = c("NHC","UNHC"),
                         sum(qq$UNHC < ZQdat$min_l[2], na.rm = T)/nunhc)) %>% 
   left_join(ZQdat)
 
-write_csv(ZQdat, "data/rating_curves/modified_ZQ_curves.csv")
+write_csv(ZQdat, "data/rating_curves/modified_ZQ_curves2.csv")
 
 # par(mfrow = c(1,1))
 # plot(qq$discharge_unhc, qq$discharge_nhc,log = "xy",
