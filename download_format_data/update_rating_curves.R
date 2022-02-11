@@ -2,163 +2,129 @@
 source("C:/Users/Alice Carter/git/nhc_50yl/src/download_format_data/calc_discharge_from_crosssection.r")
 setwd('C:/Users/Alice Carter/git/nhc_50yl/')
 
-# # 1. initial calcs to create rc_sheet ####
+# 1. initial calcs to create rc_sheet ####
 # only run this section if you have corrected/updated all previous data:
 # load and munge data
-# qdat <- read_csv("data/rating_curves/discharge_measurements.csv")
-# sp_qdat <- read_csv("data/rating_curves/discharge_measurements_NHC_UNHC.csv")
-# metadat <- read_csv("data/siteData/NHCsite_metadata.csv")
-#  
+qdat <- read_csv("data/rating_curves/discharge_measurements.csv")
+sp_qdat <- read_csv("data/rating_curves/discharge_measurements_NHC_UNHC.csv")
+metadat <- read_csv("data/siteData/NHCsite_metadata.csv")
+
 # # # setting negative V equal to zero to be consistent with E Moore's data
-# qdat$velocity_ms[qdat$velocity_ms<0] <- 0
-# 
-# qq <- data.frame()
-# for(site in unique(qdat$site)){
-#   sdat <- qdat %>%
-#   filter(site == !!site)
-# 
-#   for(date in unique(sdat$date)){
-#     dat <- sdat %>%
-#       filter(date == !!date)
-# 
-#     plot_xc(dat)
-#     out <- calc_xc_discharge(dat$distance_m, dat$depth_m, dat$velocity_ms)
-#     out <- dat %>%
-#       slice(1) %>%
-#       select(date, time, site, stage_m, notes) %>%
-#       bind_cols(out)
-#     qq <- bind_rows(qq, out)
-#   }
-# }
-# 
-# qq[,-5]
-# 
+qdat$velocity_ms[qdat$velocity_ms<0] <- 0
+
+qq <- data.frame()
+for(site in unique(qdat$site)){
+  sdat <- qdat %>%
+  filter(site == !!site)
+
+  for(date in unique(sdat$date)){
+    dat <- sdat %>%
+      filter(date == !!date)
+
+    plot_xc(dat)
+    out <- calc_xc_discharge(dat$distance_m, dat$depth_m, dat$velocity_ms)
+    out <- dat %>%
+      slice(1) %>%
+      select(date, time, site, stage_m, notes) %>%
+      bind_cols(out)
+    qq <- bind_rows(qq, out)
+  }
+}
+
+# the data from this cross sections don't seem right, so I'm leaving it out
+qq <- qq[c(-13),]
+
 # # 3. run on old SP data for NHC and UNHC ####
-# #qq <- data.frame()
-# qdat <- sp_qdat
-# for(site in unique(qdat$site)){
-#   sdat <- qdat %>%
-#   filter(site == !!site)
-# 
-#   for(date in unique(sdat$date)){
-#     dat <- sdat %>%
-#       filter(date == !!date)
-# 
-#     plot_xc(dat)
-#     out <- calc_xc_discharge(dat$distance_m, dat$depth_m, dat$velocity_ms)
-#     out <- dat %>%
-#       slice(1) %>%
-#       select(date, time, site, stage_m, notes) %>%
-#       bind_cols(out)
-#     qq <- bind_rows(qq, out)
-#   }
-# }
-# 
-# qq[,-5]
-# dev.off()
-# qq <- metadat %>%
-#   select(site = sitecode, location_m = distance_m) %>%
-#   right_join(qq, by = "site")
-# 
-# ggplot(qq, aes(stage_m, discharge)) +
-#   geom_point() +
-#   facet_wrap(.~site)
-# write_csv(qq, "data/rating_curves/calculated_discharge.csv")
-# # Add stages ####
-# qq <- read_csv("data/rating_curves/calculated_discharge.csv")
-# qq <- qq %>%
-#   mutate(DateTime_EST = round_date(ymd_hms(paste(date, time), tz = "EST"),
-#                                    unit = "15 minutes"))
-# 
-# levels <- read_csv("data/rating_curves/all_sites_level_corrected.csv") %>%
-#   pivot_wider(names_from = "site", values_from = "level_m") %>%
-#   mutate(DateTime_EST = with_tz(DateTime_UTC, tz = "EST")) %>%
-#   select(-notes)
-#   # select(DateTime_EST, NHC_level = NHC, UNHC_level = UNHC)
-# 
-# qql <- qq %>%
-#   left_join(levels)
-# 
-# # inspect data 
-# qql %>%
-#   filter(site %in% c( "NHC")) %>%
-#   ggplot(aes(stage_m, discharge)) +
-#   geom_point() +
-#   facet_wrap(.~site)
-# 
-# qql %>%
-#   filter(site == "UNHC") %>%
-#   ggplot(aes(stage_m, discharge)) +
-#   geom_point(aes(color = UNHC), size = 4)
-# 
-# # Assign proper discharges to the pool sections on days when a pool and
-# # neighboring riffle were measured
-# 
-# # PM: that q is just wrong, but we didn't measure a riffle. Will pair with
-# # interpolated Q to see what we get
-# 
-# # CBP
-# qql %>%
-#   filter(grepl("CBP", site))
-# # these two Q's look comprable, I will average them.
-# w <- which(grepl("CBP", qql$site) & qql$date == as.Date("2020-06-19"))
-# qql$discharge[w] <- mean(qql$discharge[w], na.rm = T)
-# w <- which(grepl("CBP", qql$site) & qql$date == as.Date("2020-08-23"))
-# qql$discharge[w] <- mean(qql$discharge[w], na.rm = T)
-# 
-# # WBP
-# qql %>%
-#   filter(grepl("WBP", site))
-# # here I am going to trust the riffle velocity
-# w <- which(grepl("WBP", qql$site) & qql$date == as.Date("2020-06-19"))
-# qql$discharge[w[1]] <- qql$discharge[w[2]]
-# 
-# # now correct the average velocites based on new Qs
-# # and get rid of the riffle points
-# qql$velocity_avg <- qql$discharge/qql$xc_area
-# qql <- qql %>%
-#   filter(!grepl("riffle", site))
-# 
-# qql <- qql %>%
-#   mutate(DateTime_UTC = with_tz(DateTime_EST, tz = "UTC")) %>%
-#   mutate(level = case_when(site == "NHC" ~ NHC,
-#                            site == "PM" ~ PM,
-#                            site == "CBP" ~ CBP,
-#                            site == "WB" ~ WB,
-#                            site == "WBP" ~ WBP,
-#                            site == "UNHC" ~ UNHC
-#                            )) %>%
-#   select(-(15:21))
-# 
-# # Qdat <- read_csv("data/rating_curves/interpolatedQ_allsites.csv",
-# #                  guess_max = 10000) %>%
-# #   select(-notes)
-# # qql <- qql %>%
-# #   left_join(Qdat, by = "DateTime_UTC") %>%
-# #   mutate(discharge_rc = case_when(site == "NHC" ~ NHC.Q,
-# #                            site == "PM" ~ PM.Q,
-# #                            site == "CBP" ~ CBP.Q,
-# #                            site == "WB" ~ WB.Q,
-# #                            site == "WBP" ~ WBP.Q,
-# #                            site == "UNHC" ~ UNHC.Q
-# #                            )) %>%
-# #   select(-(16:22))
-# 
-# write_csv(qql, "data/rating_curves/calculated_discharge_with_levels.csv")
+
+qdat <- sp_qdat
+for(site in unique(qdat$site)){
+  sdat <- qdat %>%
+  filter(site == !!site)
+
+  for(date in unique(sdat$date)){
+    dat <- sdat %>%
+      filter(date == !!date)
+
+    plot_xc(dat)
+    out <- calc_xc_discharge(dat$distance_m, dat$depth_m, dat$velocity_ms)
+    out <- dat %>%
+      slice(1) %>%
+      select(date, time, site, stage_m, notes) %>%
+      bind_cols(out)
+    qq <- bind_rows(qq, out)
+  }
+}
+
+dev.off()
+
+# pair discharge measurements with metadata
+qq <- metadat %>%
+  select(site = sitecode, location_m = distance_m) %>%
+  right_join(qq, by = "site")
+
+ggplot(qq, aes(stage_m, discharge)) +
+  geom_point() +
+  facet_wrap(.~site)
+write_csv(qq, "data/rating_curves/calculated_discharge.csv")
+
+# Add level data from sensor to discharge measurements ####
+qq <- read_csv("data/rating_curves/calculated_discharge.csv")
+qq <- qq %>%
+  mutate(DateTime_EST = round_date(ymd_hms(paste(date, time), tz = "EST"),
+                                   unit = "15 minutes"))
+
+levels <- read_csv("data/rating_curves/all_sites_level_corrected.csv") %>%
+  mutate(DateTime_EST = with_tz(DateTime_UTC, tz = "EST")) %>%
+  select(-notes, -DateTime_UTC)
+  # pivot_wider(names_from = "site", values_from = "level_m") %>%
+  # select(DateTime_EST, NHC_level = NHC, UNHC_level = UNHC)
+
+qql <- left_join(qq, levels, by = c('site', 'DateTime_EST'))
+
+# # inspect data
+qql %>%
+  filter(site %in% c( "NHC")) %>%
+  ggplot(aes(stage_m, discharge)) +
+  geom_point() +
+  facet_wrap(.~site)
+
+# Assign proper discharges to the pool sections on days when a pool and
+# neighboring riffle were measured
+#
+# PM: that q is just wrong, but we didn't measure a riffle. Will pair with
+# interpolated Q to see what we get
+#
+# CBP
+qql %>%
+  filter(grepl("CBP", site))
+# these two Q's look comprable, I will average them.
+w <- which(grepl("CBP", qql$site) & qql$date == as.Date("2020-06-19"))
+qql$discharge[w] <- mean(qql$discharge[w], na.rm = T)
+w <- which(grepl("CBP", qql$site) & qql$date == as.Date("2020-08-23"))
+qql$discharge[w] <- mean(qql$discharge[w], na.rm = T)
+
+# WBP
+qql %>%
+  filter(grepl("WBP", site))
+# here I am going to trust the riffle velocity
+w <- which(grepl("WBP", qql$site) & qql$date == as.Date("2020-06-19"))
+qql$discharge[w[1]] <- qql$discharge[w[2]]
+
+# now correct the average velocites based on new Qs
+# and get rid of the riffle points
+qql$velocity_avg <- qql$discharge/qql$xc_area
+qql <- qql %>%
+  filter(!grepl("riffle", site))
 
 
-# 
-# Add a zero flow point for the NHC Q curve ####
-# m_diff = 0.04436296 
+write_csv(qql, "data/rating_curves/calculated_discharge_with_levels.csv")
+
+
+# Build Rating Curves ####
 
 qql <- read_csv("data/rating_curves/calculated_discharge_with_levels.csv")
 levels <- read_csv("data/rating_curves/all_sites_level_corrected2.csv",
-                   guess_max = 1000000) #%>%
-  # mutate(level_m = case_when(site == "UNHC" ~ level_m - m_diff,
-  #                            TRUE ~ level_m))
-# left_join(qql, levels, by = c('site', 'DateTime_UTC')) %>% filter(site %in% c('NHC', 'UNHC')) %>%
-#   ggplot(aes(level_m, level)) + geom_point() + facet_wrap(~site) +geom_abline(slope = 1, intercept = 0)
-# write_csv(levels, "NHC_2019_metabolism/data/rating_curves/all_sites_level_corrected.csv")
+                   guess_max = 1000000)
 
 # unhc <- read_csv("NHC_2019_metabolism/data/metabolism/corrected_level/UNHC_lvl.csv") %>%
 #   mutate(level_m = level_m - m_diff)
@@ -180,42 +146,61 @@ levels <- levels %>%
 
 # Build Rating Curves ####
 # qql$stage_m[qql$site =="UNHC"][2] <- qql$UNHC[qql$site =="UNHC"][2]
+plot(qql$stage_m, qql$level_m)
+identify(qql$stage_m, qql$level_m, labels = qql$date)
+abline(0,1)
+# the stages on 9/22/2016 are much higher than the levels at both sites,
+# but the plot below suggests that that is a problem with the level data, 
+# not the stage, so I am leaving them in to calculate rating curves.
+
 nhc <- qql %>%
   filter(site =="NHC")
 
 # nhc <- data.frame(stage_m = .64, discharge = 0.005) %>% bind_rows(nhc)
+
 unhc <- qql %>%
   filter(site =="UNHC") %>%
-  slice(c(-2, -3))
-# unhc$discharge[1]<- c(.001)
-# unhc <- data.frame(stage_m = .35, discharge = 0.01) %>% bind_rows(unhc)
+  arrange(date) 
+
+plot(unhc$stage_m, unhc$discharge, log = 'xy')
+identify(unhc$stage_m, unhc$discharge, unhc$date)
+
+# the point from 2016-07-15 looks like the stage or discharge is off, 
+# I'm going to leave it out
+
+unhc <- unhc[-1,]
+plot(unhc$stage_m, unhc$discharge, log = 'xy')
+
+png('figures/ratingcurves.png', width = 480, height = 300)
+m <- lm(log(discharge)~log(stage_m), data = nhc)
+m_coef <- summary(m)$coefficients[,1]
 # 
-# m <- lm(log(discharge)~log(stage_m), data = nhc)
-# m_coef <- summary(m)$coefficients[,1]
-# 
-# What does this curve predict at 0.62 stage?
-# plot(nhc$stage_m, nhc$discharge, xlim = c(.5, 1.5), ylim = c(0,2))
-# lines(seq(0,2, by = .01), exp(m_coef[1]) * seq(0,2, by = .01) ^ m_coef[2], col = 2)
-# med <- median(levels$NHC, na.rm = T)
-# nhc_medq <- exp(m_coef[1]) * med ^ m_coef[2]
-# abline(h = nhc_medq, v = med)
-# par(new = T)
-# plot(density((levels$NHC), na.rm = T), col = 3, xlim = c(.5, 1.5), axes = F)
-# 
+# What does this curve predict at 0.64 stage?
+nhc_zeroq <- exp(m_coef[1]) * 0.64 ^ m_coef[2]
+par(mfrow = c(1, 2))
+plot(nhc$stage_m, nhc$discharge, xlim = c(.5, 1.5), ylab = 'discharge', 
+     xlab = 'NHC stage')
+lines(seq(0,2, by = .01), exp(m_coef[1]) * seq(0,2, by = .01) ^ m_coef[2])
+
+par(new = T)
+plot(density((levels$NHC), na.rm = T), col = 3, xlim = c(.5, 1.5), axes = F,
+     xlab = '', ylab = '', main = '')
+
 # #calculate expected median UNHC by watershed area
 # unhc_medq <- nhc_medq *sites$ws_area.km2[7]/sites$ws_area.km2[1]
 # 
-# m <- lm(log(discharge)~log(stage_m), data = unhc)
-# m_coef <- summary(m)$coefficients[,1]
-# plot(unhc$stage_m, (unhc$discharge), xlim = c(.2, .8), ylim = c(0,2))
-# lines(seq(0,2, by = .01), exp(m_coef[1]) * seq(0,2, by = .01) ^ m_coef[2], col = 2)
-# u_med <- median(levels$UNHC, na.rm = T)
-# med <- (unhc_medq/exp(m_coef[1])) ^ (1/m_coef[2])
-# abline(h = unhc_medq, v = med)
-# 
-# par(new = T)
-# plot(density((levels$UNHC), na.rm = T), col = 3, xlim = c(.2, .8), axes = F)
-# med_diff <- u_med-med
+m <- lm(log(discharge)~log(stage_m), data = unhc)
+m_coef <- summary(m)$coefficients[,1]
+plot(unhc$stage_m, (unhc$discharge), xlim = c(.2, .8), ylim = c(0,2), 
+     ylab = 'discharge', xlab = 'UNHC stage')
+lines(seq(0,2, by = .01), exp(m_coef[1]) * seq(0,2, by = .01) ^ m_coef[2])
+
+par(new = T)
+plot(density((levels$UNHC), na.rm = T), col = 3, xlim = c(.2, .8), axes = F, 
+     xlab = '', ylab = '', main = "")
+par(new = T, mfrow = c(1,1))
+mtext("Distribution of level data compared to Rating Curves", 3, 1)
+dev.off()
 
 build_powerlaw_rc <- function(l, q, site){
   m <- lm(log(q)~log(l))
@@ -239,15 +224,6 @@ ZQdat$min_Q = 0
 ZQdat$min_l = 0.64
 ZQdat <- bind_rows(ZQdat, build_powerlaw_rc(unhc$stage_m, unhc$discharge, "UNHC"))
 
-png('figures/ratingcurves.png', width = 480, height = 300)
-par(mfrow =  c(1,2))
-plot(nhc$stage_m, nhc$discharge, xlim = c(0.5, 1.5), main = "NHC",
-     ylab = 'discharge m3/s', xlab = 'stage m')
-curve(exp(ZQdat$a[1])*x^ZQdat$b[1], add = T )
-plot(unhc$stage_m, unhc$discharge, xlim = c(0.3, 1), main = "UNHC",
-     ylab = 'discharge m3/s', xlab = 'stage m')
-curve(exp(ZQdat$a[2])*x^ZQdat$b[2], add = T )
-dev.off()
 # Calculate discharge from rating curves ####
 # Q = a * level ^ b
 # ZQdat_sp <- read_csv(file="data/siteData/NC_streampulseZQ_data.csv")

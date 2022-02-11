@@ -1,7 +1,12 @@
 # Build a basic linear mixed effects model of met as f(temp, Q)
 library(lme4)
-dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer.rds")
+library(tidyverse)
+library(lubridate)
+setwd('C:/Users/Alice Carter/git/nhc_50yl/')
 
+dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer.rds")
+sites <- read_csv('data/siteData/NHCsite_metadata.csv') %>%
+  slice(c(1:5, 7))
 met <- dat$preds 
 
 dd <- tibble()
@@ -19,8 +24,8 @@ d <- dd %>%
 met <- met %>%
   rename(depth_hall = depth) %>%
   left_join( d, by = c('site', 'date')) %>%
-  mutate(case_when(is.na(depth) ~ depth_hall,
-                   TRUE ~ depth)) %>%
+  mutate(depth = case_when(is.na(depth) ~ depth_hall,
+                           TRUE ~ depth)) %>%
   select(-depth_hall)
                  
 # subset out modern dataset to build model
@@ -35,7 +40,7 @@ ggplot(mm, aes(date, ER, col = year)) +
 ggplot(mm, aes(site, (K600)))+
   geom_boxplot() #+ facet_wrap(~year)
 
-ggplot(mm, aes(temp.water, ER, col = factor(month)))+
+ggplot(mm, aes(temp.water, log(discharge), col = factor(month)))+
   geom_point() + geom_smooth(method = lm) +
   facet_wrap(~site)
 
@@ -50,12 +55,16 @@ yy <- mm %>%
   left_join(sites, by = 'sitecode') %>%
   select(site = sitecode, year, logQ_mean, depth_mean, distance_m, slope)
 
-fall <- mm %>%
-  filter(month %in% c(10,11)) %>%
-  select(date, GPP, ER, logQ, temp.water, site, year) %>%
-  left_join(yy, by = 'year')
+dat <- left_join(mm, yy, by = c('site', 'year')) %>%
+  select(-method, -era)
+write_csv(dat, 'data/metabolism/metabolism_and_drivers.csv')
 
-ggplot(fall, aes(date, ER, col = factor(year)))+
+fall <- dat %>%
+  filter(month %in% c(10)) %>%
+  select(date, GPP, ER, logQ, temp.water, site, year, logQ_mean, 
+         depth_mean, distance_m, slope)
+
+ggplot(fall, aes(temp.water, ER, col = factor(year)))+
   geom_point() + geom_smooth(method = lm) +
   facet_wrap(year~site, scales = 'free_x')
 # scale data to model:
@@ -65,7 +74,7 @@ sfall <- fall %>%
                 .fns = scale))
 # model for ER ####
 
-mER = lmer(ER ~ temp.water + (temp.water|site.x) + (temp.water|logQ_mean), 
+mER = lmer(ER ~ temp.water + (temp.water|slope) + (temp.water|logQ_mean), 
            data = sfall)
 summary(mER)$coeff
 confint(mER)
