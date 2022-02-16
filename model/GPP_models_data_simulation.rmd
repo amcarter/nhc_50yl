@@ -1,0 +1,129 @@
+---
+title: "GPP model for NHC"
+author: "Alice Carter"
+date: "2/15/2022"
+output: html_document
+---
+Task: build a basic hierarchical model of productivity as a function of light, temperature, and discharge.
+
+### Initial model
+
+To start, I will model productivity $P$ as an autoregressive function with terms for light ($l$), temp ($T$), and discharge ($Q$) included. If this proves insufficient, I will incorporate a latent biomass term.
+
+$$P_t = \phi P_{t-1} + \beta_1 l_t + \beta_2 T_t + \beta_3 log(Q_t) + \epsilon_t$$
+$$\epsilon_t \sim N(0,\sigma_{proc})$$
+$$P_{obs,t} \sim N(P_t, sigma_{obs})$$
+Simulate some data based on real driver variables:
+
+```{r}
+
+dat <- read_csv("C:/Users/Alice Carter/git/nhc_50yl/data/metabolism/metabolism_and_drivers.csv")
+drivers <- dat %>%
+  filter(site == 'WBP') %>%
+  select(date, light, temp.water, discharge, GPP) %>%
+  mutate(across(-date, zoo::na.approx, na.rm = F),
+         logQ = log(discharge),
+         light = light/max(light, na.rm = T))
+
+phi = 0.8
+b_light = 0.05
+b_temp = 0.001
+b_q = -0.1
+sig_o = .1
+sig_p = .1
+
+Phat = P = numeric()
+Phat[1] = P[1] = 1
+N = nrow(drivers)
+
+for (i in 2:N){
+  Phat[i] = phi *Phat[i-1] + b_light * drivers$light[i] + 
+    b_temp * drivers$temp.water[i] + b_q * drivers$logQ[i] 
+  P[i] = rnorm(1, Phat[i], sig_p)
+  if(P[i] < 0) P[i] = 0
+}
+
+P_obs <- rnorm(N, P, sig_o)
+
+plot(drivers$date, P_obs)
+lines(drivers$date, drivers$GPP)
+lines(drivers$date, drivers$light/1000, col = 2)
+```
+
+### Latent biomass model
+
+An alternative approach to the phenomenological one presented above is a model that takes into account the latent biomass of primary producers to model $P$ mechanistically. Here, I am implementing a version of this type of model from Segatto et al 2020. I am choosing to leave out the density dependance of Biomass, because I do not think that NHC is ever space limited.
+
+$$P(t) = \mu_{P,20} f_{T,L}(t)B_A(t)$$
+$$f_{T,L}(t) = \theta_A^{T(t)-20} \frac{PAR(t)}{PAR(t) + K_{PAR}$$
+$$B_A(t) = B_A(t-1) + P(t-1) - e^{s(Q(t) - c)}$$
+ary(tidyverse)
+Where $\
+library(lme4)
+
+setwd('C:/Users/Alice Carter/git/nhc_50yl/')
+
+sites <- read_csv('data/siteData/NHCsite_metadata.csv') %>%
+  slice(c(1:5, 7))
+
+# Test basic GPP model
+P <- dat %>% 
+  select(date, site, GPP, GPP.lower, GPP.upper, discharge, 
+         temp.water, light, slope) %>%
+  group_by(site) %>%
+  mutate(GPP_pre = c(NA, GPP[1:(n()-1)]))
+
+P <- filter(P, site == 'CBP') %>%
+  mutate(discharge = log(discharge),
+         across(.cols = any_of(c('light', 'discharge')), .fns = scale))
+mod <- lm(GPP ~ GPP_pre + light + discharge, data = P)
+summary(mod)
+
+phi = 0.83
+b_light = 0.0364
+b_q = .06826
+p = numeric()
+p[1] = P$GPP[2]
+for(i in 2:nrow(P)){
+  p[i] = phi * p[i-1] + b_light * P$light[i] + b_q * P$discharge[i]
+}
+plot(P$date, p, ylim = c(-1,2))
+lines(P$date, P$GPP)
+plot(P$date, P$light)
+m = T))
+
+shapiro.test(dat$GPP)
+library(ggpubr)
+ggqqplot(dat$ER)
+aes(temp.water, GPP, col = factor(month))) +
+  geom_point() +
+  facet_wrap(~site, scales = 'free_y') +
+
+  geom_smooth(method = lm)
+
+mod <- brms::brm(ER ~ (1 + temp.water| slope +  logQ_mean), data = dat, iter = 1000)
+mod
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

@@ -36,7 +36,10 @@ source("src/download_format_data/update_rating_curves.R")
 # e. Calculate coefficients for depthxQ and velocityxQ relationships
 source("src/download_format_data/calc_avg_channel_crosssections.R")
 
-# f. Prepare datafiles for modeling metabolism
+# f. get light data from StreamLight package:
+source("src/download_format_data/get_light_from_StreamLight.R")
+
+# g. Prepare datafiles for modeling metabolism
 source("src/download_format_data/prep_raw_SPdata.R")
 
 # these files are now ready to be run for SM metabolism or Hall metabolism
