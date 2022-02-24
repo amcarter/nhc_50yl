@@ -27,11 +27,12 @@ model {
   k_b = 8.6173 * 10^-5;
   AR = 0.5;
   C[1] ~ normal(C0, sigma_proc);
-  R[1] ~ normal(R_obs[1], sigma_obs);
+  R[1] = R_obs[1];
   
   // iterate through timesteps:
   for(i in 2:N){
     C[i] ~ normal((C[i-1] + litter[i] - R[i-1] + P_obs[i-1])*(1 - b2*Q[i]), sigma_proc);
+    //if(C[i] < 0) C[i] = 0;
     R[i] = 10^8 *b1 * C[i] * exp(-E/(k_b * tempK[i])) + AR * P_obs[i];
   }
   
@@ -40,8 +41,8 @@ model {
   
   // Priors:
   b1 ~ normal(0, 1);
-  b2 ~ normal(0, 1);
-  E ~ normal(0.65, 0.1);
-  sigma_proc ~ normal(0,1);
+  //b2 ~ normal(0, 1);
+  E ~ normal(0.63, 0.1);
+  //sigma_proc ~ normal(0,1);
   sigma_obs ~ normal(0,1);
 }

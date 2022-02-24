@@ -8,9 +8,10 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = 'C:/Users/Alice Carter/git/nhc_50yl')
 setwd('C:/Users/Alice Carter/git/nhc_50yl/')
-dat <- read_csv('data/metabolism/metabolism_and_drivers.csv')
 library(tidyverse)
 library(rstan)
+library(bayesplot)
+dat <- read_csv('data/metabolism/metabolism_and_drivers.csv')
 
 ```
 Overview: We are building a model of ecosystem respiration based on physical drivers using our modern dataset from New Hope Creek. We will then use this model to predict respiration rates that we would have expected in 1969 based on this modern understanding. To test our understanding of how the ecosystem metabolism has changed over 50 years, we will compare these predictions to measured rates of ER in the past.
@@ -50,12 +51,6 @@ $$\beta_1 \sim N(0, 1)$$
 $$\beta_2 \sim N(0,1)$$
 $$\sigma_{proc} \sim N(0,1), \sigma_{proc} > 0$$
 $$\sigma_{obs} \sim N(0,1), \sigma_{obs} > 0$$
-
-### Stan Code
-
-```{r, comment='', echo = FALSE}
-cat(read_lines('src/model/ss_ER.stan'), sep = '\n')
-```
 
 ### Simulate data
 
@@ -135,21 +130,69 @@ data.frame(date = cbp$date, P = P, R = R_obs, C = C) %>%
 
 ```
 
-### Run Stan model on simulated data:
+### Stan Code
+
+First, we will try a simpler model where we include the carbon storage as an input rather than modeling it as a latent state:
+
+```{r, comment='', echo = FALSE}
+cat(read_lines('src/model/stan/ER_base_model_1.stan'), sep = '\n')
+```
+
+Running this model on our simulated data, we are somewhat able to recover parameters:
+
+```{r, eval = FALSE}
+stan_dat <- list(N = length(R_obs), R_obs = R_obs, P_obs = P,
+                 tempK = temp, C = C)
+
+mod <- stan('src/model/ss_ER.stan', 
+            data = stan_dat,
+            chains = 4, init = 0,
+            warmup = 500, iter = 1000)
+```
+
+
+```{r, echo = FALSE}
+mod <- readRDS('src/model/model_runs/simulated_ER_base_mod_1.rds')
+traceplot(mod, ncol = 1)
+
+```
+
+The chains look fine, and are spot on for the activation energy, E, and the observation error, but the model estimate for $\beta_1$ is ~3.7, while the true value is 0.5
+
+While this needs to be addressed, I will try running the more complex model with C as an underlying latent state:
+
+### State space ER model:
+
+```{r, comment='', echo = FALSE}
+cat(read_lines('src/model/ss_ER.stan'), sep = '\n')
+```
 
 ```{r, eval = FALSE}
 stan_dat <- list(N = length(R_obs), R_obs = R_obs, P_obs = P,
                  tempK = temp, Q = Q, litter = litter, C0 = C[1])
 
-mod <- stan('src/model/ss_ER.stan', 
-            data = stan_dat,
-            chains = 4, 
-            warmup = 500, iter = 1000)
+mod2 <- stan('src/model/ss_ER.stan', 
+            data = stan_dat, init = 0,
+            chains = 4, cores = 4, 
+            warmup = 200, iter = 500)
 ```
 
-```{r, include = FALSE}
-saveRDS(mod, 'src/model/model_runs/simulated_ss_ER.rds')
-
-mod <- readRDS('src/model/model_runs/simulated_ss_ER.rds')
+```{r, echo = FALSE}
+# saveRDS(mod, 'src/model/model_runs/simulated_ss_ER.rds')
+mod2 <- readRDS('src/model/model_runs/simulated_ss_ER.rds')
+traceplot(mod2, ncol = 1, pars=c('b1', 'b2', 'E', 'sigma_obs', 'sigma_proc'))
 ```
-ll incorporate a latent biomass term. "src/model/Stan_ProductivityModel2_Ricker_fixedinit_obserr.stan", data = stan_data_l, chains = 4,iter = 5000  $$P_t = \phi P_{t-1} + \beta_1 l_t + \beta_2 T_t + \beta_3 log(Q_t) + \epsilon_t$$ $$\epsilon_t \sim N(0,\sigma_{proc})$$ $$P_{obs,t} \sim N(P_t, sigma_{obs})$$ Simulate some data based on real driver variables:  ```{r}  dat <- read_csv("data/metabolism/metabolism_and_drivers.csv") drivers <- dat %>% filter(site == 'CBP') %>% mutate(GPP_sd = (GPP.upper - GPP.lower)*.33/.95) %>% select(date, PAR_surface, LAI, temp.water, discharge, GPP, GPP_sd) %>% mutate(across(-date, zoo::na.approx, na.rm = F), logQ = (log(discharge)), tQ = discharge/max(discharge, na.rm = T), light = PAR_surface/max(PAR_surface, na.rm = T)) %>% arrange(date) drivers <- drivers %>% mutate(GPP_l = c(NA, GPP[1:(n()-1)] ))  phi = 0.949 b_light = 0.0577 # b_temp = 0.001 b_q = 0.132 sig_o = 0.05 sig_p = 0.05  Phat = P = numeric() Phat[1] = P[1] = 1 N = nrow(drivers)  for (i in 2:N){ Phat[i] = phi *Phat[i-1] + b_light * drivers$light[i]  P[i] = rnorm(1, Phat[i], sig_p) if(P[i] < 0) P[i] = 0 }  P_obs <- rnorm(N, P, sig_o)  plot(drivers$date, P_obs, ylim = c(0, 2)) lines(drivers$date, drivers$GPP) lines(drivers$date, drivers$light, col = 2) lines(drivers$date, drivers$temp.water/2 + .7, col = 4) lines(drivers$date, drivers$logQ/3 + 1, col = 3) lines(drivers$date, drivers$LAI/3) plot(drivers$GPP, P_obs) abline(0,1) m <- lm(GPP ~ GPP_l + light aarv)umr()`{}#rhd-DtinR<uc,btd)e
+
+For this model, parameter recovery of $\beta_1$, $E$, and $\sigma_{obs}$ is similar to the simpler model ($\beta_1$ is still too high). $\beta_2$ is right on at 0.8, but $\sigma_{proc}$ is not converging.
+
+```{r}
+fit <- summary(mod2)
+modC <- fit$summary[4:363,1] 
+modC_sd <- fit$summary[4:363,3]
+
+plot(cbp$date, C, type = 'l', ylab = 'Carbon (g/m2)', xlab = 'Date')
+points(cbp$date, modC)
+legend('topleft', c('underlying state', 'modeled'), 
+       lty = c(1,0), pch = c(NA,1), bty = 'n')
+
+```
