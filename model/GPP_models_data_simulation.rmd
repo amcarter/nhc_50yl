@@ -4,6 +4,12 @@ author: "Alice Carter"
 date: "2/15/2022"
 output: html_document
 ---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = 'C:/Users/Alice Carter/git/nhc_50yl')
+setwd('C:/Users/Alice Carter/git/nhc_50yl')
+library(tidyverse)
+```
 Task: build a basic hierarchical model of productivity as a function of light, temperature, and discharge.
 
 ### Initial model
@@ -17,37 +23,83 @@ Simulate some data based on real driver variables:
 
 ```{r}
 
-dat <- read_csv("C:/Users/Alice Carter/git/nhc_50yl/data/metabolism/metabolism_and_drivers.csv")
+dat <- read_csv("data/metabolism/metabolism_and_drivers.csv")
 drivers <- dat %>%
-  filter(site == 'WBP') %>%
-  select(date, light, temp.water, discharge, GPP) %>%
+  filter(site == 'CBP') %>%
+  mutate(GPP_sd = (GPP.upper - GPP.lower)*.33/.95) %>%
+  select(date, PAR_surface, LAI, temp.water, discharge, GPP, GPP_sd) %>%
   mutate(across(-date, zoo::na.approx, na.rm = F),
-         logQ = log(discharge),
-         light = light/max(light, na.rm = T))
+         logQ = (log(discharge)),
+         tQ = discharge/max(discharge, na.rm = T),
+         light = PAR_surface/max(PAR_surface, na.rm = T)) %>%
+  arrange(date)
+drivers <- drivers %>%
+  mutate(GPP_l = c(NA, GPP[1:(n()-1)] ))
 
-phi = 0.8
-b_light = 0.05
-b_temp = 0.001
-b_q = -0.1
-sig_o = .1
-sig_p = .1
+phi = 0.949
+b_light = 0.0577
+# b_temp = 0.001
+b_q = 0.132
+sig_o = 0.05
+sig_p = 0.05
 
 Phat = P = numeric()
 Phat[1] = P[1] = 1
 N = nrow(drivers)
 
 for (i in 2:N){
-  Phat[i] = phi *Phat[i-1] + b_light * drivers$light[i] + 
-    b_temp * drivers$temp.water[i] + b_q * drivers$logQ[i] 
+  Phat[i] = phi *Phat[i-1] + b_light * drivers$light[i] 
   P[i] = rnorm(1, Phat[i], sig_p)
   if(P[i] < 0) P[i] = 0
 }
 
 P_obs <- rnorm(N, P, sig_o)
 
-plot(drivers$date, P_obs)
+plot(drivers$date, P_obs, ylim = c(0, 2))
 lines(drivers$date, drivers$GPP)
-lines(drivers$date, drivers$light/1000, col = 2)
+lines(drivers$date, drivers$light, col = 2)
+lines(drivers$date, drivers$temp.water/2 + .7, col = 4)
+lines(drivers$date, drivers$logQ/3 + 1, col = 3)
+lines(drivers$date, drivers$LAI/3)
+plot(drivers$GPP, P_obs)
+abline(0,1)
+m <- lm(GPP ~ GPP_l + light, data = drivers)
+
+summary(m)
+```
+
+```{r}
+## Growth Model 1 - Data simulation 
+
+PM_AR <- function(phi, alpha, beta, sig_p, sig_o, df) {
+  ## Data
+  Ndays<-length(df$GPP)
+  GPP <- df$GPP
+  GPP_sd <- df$GPP_sd
+  light <- df$light
+  tQ <- df$tQ # discharge standardized to max value
+  
+  ## Vectors for model output
+  pred_GPP<-numeric(Ndays)
+  pred_GPP[1] <- GPP[1]
+  l_pred_GPP <- numeric(Ndays)
+  l_pred_GPP[1] <- log(GPP[1])
+  
+  ## Process model
+  for (j in 2:Ndays) {
+    l_pred_GPP[j] = MCMCglmm::rtnorm(1, mean=phi*l_pred_GPP[j-1] + alpha*light[j] + beta*tQ[j], sd = sig_p, upper=5)
+  }
+  
+  for (i in 2:Ndays){
+  pred_GPP[i] <- MCMCglmm::rtnorm(1, mean = exp(l_pred_GPP[i]), sd = sig_o, lower=0.01)
+  }
+  
+  return(pred_GPP)
+}
+
+
+PM_AR(phi, b_light, b_q, 0.1, 0.1, drivers)
+
 ```
 
 ### Latent biomass model
@@ -104,26 +156,5 @@ aes(temp.water, GPP, col = factor(month))) +
 mod <- brms::brm(ER ~ (1 + temp.water| slope +  logQ_mean), data = dat, iter = 1000)
 mod
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+raopagaagLFMrcssResnittlstceua`td%=dae_am

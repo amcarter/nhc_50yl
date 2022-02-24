@@ -1,0 +1,155 @@
+---
+title: "ER model for NHC"
+author: "Alice Carter"
+date: "2/2022"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = 'C:/Users/Alice Carter/git/nhc_50yl')
+setwd('C:/Users/Alice Carter/git/nhc_50yl/')
+dat <- read_csv('data/metabolism/metabolism_and_drivers.csv')
+library(tidyverse)
+library(rstan)
+
+```
+Overview: We are building a model of ecosystem respiration based on physical drivers using our modern dataset from New Hope Creek. We will then use this model to predict respiration rates that we would have expected in 1969 based on this modern understanding. To test our understanding of how the ecosystem metabolism has changed over 50 years, we will compare these predictions to measured rates of ER in the past.
+
+Outline:
+1. Build a state space model of respiration as a function of discharge, water temperature, and litterfall with a latent carbon storage state. 
+2. Test model on simulated data.
+3. Adapt model to incorporate missing data.
+4. Fit model to modern NHC data at one site.
+
+Next steps:
+- Expand model to a hierarchical structure that allows for information sharing across sites.
+- Use model to predict rates of ER in the past
+- Compare monthly averaged rates to measured past values.
+
+### Model Description
+
+We will model respiration ($R$) as a function of the productivity ($P$), the carbon storage available for respiration ($C$), and temperature ($T$). The carbon stored in the stream is a latent state in the model that will evolve as a random walk with removal through discharge and respiration, and additions through annual litterfall ($L$). 
+
+#### Process model
+
+$$ R_t = \beta_1 C_t * e ^ {E/k_b T} + AR*P_t$$
+$$ C_t = C_{t-1} + L_t - R_{t-1} - \beta_2 Q_t C_{t-1} + \epsilon_t$$
+$$ \epsilon_t \sim N(0, \sigma_{proc})$$
+
+Where $\beta$ are parameters to be estimated, $E$ is the activation energy for heterotrophic respiration, $k_b$ is Boltzman's constant, $AR$ is the fraction of autotrophic respiration (fixed at 0.5 in this model). Litterfall ($L$) is a fixed constant $l$ representing the annual litterfall (500 g/m2/y) divided by the number of days of leaf off (20 days) multiplied by a vector of zeros and ones representing the time period of leaf off.
+
+#### Observation model
+
+$$R_{obs,t} \sim N(R_t, \sigma_{obs})$$
+
+
+#### Priors
+
+$$E \sim N(0.65, 0.1)$$
+$$\beta_1 \sim N(0, 1)$$
+$$\beta_2 \sim N(0,1)$$
+$$\sigma_{proc} \sim N(0,1), \sigma_{proc} > 0$$
+$$\sigma_{obs} \sim N(0,1), \sigma_{obs} > 0$$
+
+### Stan Code
+
+```{r, comment='', echo = FALSE}
+cat(read_lines('src/model/ss_ER.stan'), sep = '\n')
+```
+
+### Simulate data
+
+Use real input data to simulate ER and GPP:
+
+```{r, echo = FALSE}
+cbp <- dat %>%
+  filter(site == 'CBP') %>%
+  arrange(date) %>% 
+  select(date, ER, GPP, temp.water, discharge, PAR_surface) %>%
+  group_by(date) %>%
+  summarize(across(everything(), mean, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(across(-date, zoo::na.approx, na.rm = F)) %>%
+  filter(!is.na(ER))
+
+# define litterfall to be 20 days from Oct 5th - 24th with the total annual litter = 500 gC/m2/y, so daily litterfall = 25 gC/m2/d
+cbp <- mutate(cbp, litter = case_when(date >= as.Date('2019-10-05') & 
+                                        date <= as.Date('2019-10-24') ~ 25,
+                                      TRUE ~ 0))
+mutate(cbp, logQ = log(discharge)) %>%
+  select(date, temp = temp.water, logQ, light = PAR_surface, litter) %>%
+  pivot_longer(-date, names_to = 'variable', values_to = 'value') %>%
+  ggplot(aes(date, value, col = variable)) +
+  geom_line() +
+  facet_wrap(.~variable, nrow = 4, scales = 'free_y')
+  
+```
+
+```{r}
+N <- nrow(cbp)
+light = cbp$PAR_surface/max(cbp$PAR_surface)
+Q = cbp$discharge/max(cbp$discharge)
+temp = cbp$temp.water + 273
+
+
+litter = cbp$litter
+
+# simulate GPP
+P <- numeric()
+P[1] = 0.5
+for(i in 2:N){
+  P[i] = 0.5 * P[i-1] + 0.8 * light[i] + rnorm(1,0, 0.05)
+}
+
+# define parameters
+b1 = .5 * 10e8 # I can only get a measurable amount of heterotrophic respiration with an extremely high b1 
+b2 = .8
+E = 0.63
+sigma_proc = 0.1
+sigma_obs = 0.05 # adjust this based on the actual measurement error in the data
+
+# Constants
+k_b = 8.6173 * 10^-5
+AR = 0.5
+
+# Process model
+C = numeric()
+R = numeric()
+R_obs = numeric()
+C[1] = 100 # initial accessible carbon storage in stream
+R[1] = b1 * C[1] * exp(-E/(k_b * temp[1])) + AR * P[1]
+
+for(i in 2:N){
+  C[i] = (C[i-1] + litter[i] - R[i-1] + P[i-1])*(1-b2*Q[i]) + rnorm(1, 0, sigma_proc)
+  if(C[i]<0) C[i] = 0
+  R[i] = b1 * C[i] * exp(-E/(k_b * temp[i])) + AR * P[i]
+}
+
+R_obs = rnorm(N, R, sigma_obs)
+
+data.frame(date = cbp$date, P = P, R = R_obs, C = C) %>%
+  pivot_longer(-date, names_to = 'var', values_to = 'value') %>%
+  ggplot(aes(date, value, col = var)) +
+  geom_line()+
+  facet_wrap(.~var, scales = 'free_y', nrow = 3)
+
+```
+
+### Run Stan model on simulated data:
+
+```{r, eval = FALSE}
+stan_dat <- list(N = length(R_obs), R_obs = R_obs, P_obs = P,
+                 tempK = temp, Q = Q, litter = litter, C0 = C[1])
+
+mod <- stan('src/model/ss_ER.stan', 
+            data = stan_dat,
+            chains = 4, 
+            warmup = 500, iter = 1000)
+```
+
+```{r, include = FALSE}
+saveRDS(mod, 'src/model/model_runs/simulated_ss_ER.rds')
+
+mod <- readRDS('src/model/model_runs/simulated_ss_ER.rds')
+```
+ll incorporate a latent biomass term. "src/model/Stan_ProductivityModel2_Ricker_fixedinit_obserr.stan", data = stan_data_l, chains = 4,iter = 5000  $$P_t = \phi P_{t-1} + \beta_1 l_t + \beta_2 T_t + \beta_3 log(Q_t) + \epsilon_t$$ $$\epsilon_t \sim N(0,\sigma_{proc})$$ $$P_{obs,t} \sim N(P_t, sigma_{obs})$$ Simulate some data based on real driver variables:  ```{r}  dat <- read_csv("data/metabolism/metabolism_and_drivers.csv") drivers <- dat %>% filter(site == 'CBP') %>% mutate(GPP_sd = (GPP.upper - GPP.lower)*.33/.95) %>% select(date, PAR_surface, LAI, temp.water, discharge, GPP, GPP_sd) %>% mutate(across(-date, zoo::na.approx, na.rm = F), logQ = (log(discharge)), tQ = discharge/max(discharge, na.rm = T), light = PAR_surface/max(PAR_surface, na.rm = T)) %>% arrange(date) drivers <- drivers %>% mutate(GPP_l = c(NA, GPP[1:(n()-1)] ))  phi = 0.949 b_light = 0.0577 # b_temp = 0.001 b_q = 0.132 sig_o = 0.05 sig_p = 0.05  Phat = P = numeric() Phat[1] = P[1] = 1 N = nrow(drivers)  for (i in 2:N){ Phat[i] = phi *Phat[i-1] + b_light * drivers$light[i]  P[i] = rnorm(1, Phat[i], sig_p) if(P[i] < 0) P[i] = 0 }  P_obs <- rnorm(N, P, sig_o)  plot(drivers$date, P_obs, ylim = c(0, 2)) lines(drivers$date, drivers$GPP) lines(drivers$date, drivers$light, col = 2) lines(drivers$date, drivers$temp.water/2 + .7, col = 4) lines(drivers$date, drivers$logQ/3 + 1, col = 3) lines(drivers$date, drivers$LAI/3) plot(drivers$GPP, P_obs) abline(0,1) m <- lm(GPP ~ GPP_l + light aarv)umr()`{}#rhd-DtinR<uc,btd)e

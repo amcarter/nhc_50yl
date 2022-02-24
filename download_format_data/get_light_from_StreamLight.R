@@ -186,9 +186,10 @@ CBP_predicted %>%
     theme_minimal()
 
 # Combine the outputs into one file
+working_dir <- 'C:/Users/Alice Carter/git/nhc_50yl/data/light/drivers/'
 dat <- data.frame()
-for(site in site_parm[,'Site_ID']){
-  pred <- readRDS(paste(working_dir, '/', site, '_predicted.rds', sep = ''))
+for(site in data.frame(site_parm)[,'Site_ID']){
+  pred <- readRDS(paste(working_dir, site, '_predicted.rds', sep = ''))
   ss <- pred %>% 
   select(local_time, LAI, PAR_inc, PAR_surface) %>%
   mutate(date = as.Date(local_time, tz = 'EST'),
@@ -205,5 +206,5 @@ dat %>% filter(date > as.Date('2019-03-01')) %>%
 ggplot(aes(date, PAR_surface, col = site)) +
   geom_point()
 
-write_csv(dat, 'daily_modeled_light_all_sites.csv')
+write_csv(dat, paste0(working_dir, 'daily_modeled_light_all_sites.csv'))
 
