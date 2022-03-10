@@ -1,6 +1,7 @@
 ## Model Metabolism #
 # adapted from JRB script
 # This version runs metabolism on NHC sites using the K600 values from Hall 1972
+setwd('C:/Users/Alice Carter/git/nhc_50yl/')
 source("src/metabolism/inspect_model_fits.r")
 # Compile model outputs ####
 
@@ -18,6 +19,7 @@ sn <- data.frame(site = c('nhc', 'pm', 'cbp','wb','wbp','unhc'),
                  sn = c('NHC_8.5', 'NHC_6.9', 'NHC_5', 
                         'NHC_2.5', 'NHC_2.3', 'NHC_0'))
  # pdf("figures/model_diagnostics_raymond.pdf", width = 9, height = 6)
+obserr <- data.frame()
 for(file in filelist) {
   # uninformed raymond ests
   fit <- readRDS(paste0("data/metabolism/modeled/finalQ/", file))
@@ -32,6 +34,13 @@ for(file in filelist) {
   } else { 
     year = 2019 
   }
+# Incorporate something here to look at obs and proc error
+#   obs <- get_fit(fit)$overall %>%
+#     select(err_obs_iid_sigma_50pct, err_obs_iid_sigma_Rhat,
+#            err_proc_iid_sigma_50pct, err_proc_iid_sigma_Rhat) %>%
+#     mutate(site = site, year = year)
+#   obserr <- bind_rows(obserr, obs)  
+# }
   if(site == "wbp"){
     fit@data <- fit@data %>% filter(date <= as.Date("2020-03-20"))
     fit@fit$daily <- fit@fit$daily %>% filter(date <= as.Date("2020-03-20"))
