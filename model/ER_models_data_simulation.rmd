@@ -61,16 +61,20 @@ Use real input data to simulate ER and GPP:
 ```{r, echo = FALSE}
 
 # define litterfall to be 20 days from Oct 5th - 24th with the total annual litter = 500 gC/m2/y, so daily litterfall = 25 gC/m2/d
-cbp <- dat %>%
+cbp_miss <- dat %>%
   filter(site == 'CBP') %>%
   select(-site) %>%
   arrange(date) %>%
-  mutate(across(-date, zoo::na.approx, na.rm = F),
+  mutate(across(c(-date, -ER), zoo::na.approx, na.rm = F),
          litter = case_when(date >= as.Date('2019-10-05') & 
                               date <= as.Date('2019-10-24') ~ 25,
                             TRUE ~ 0),
          logQ = log(discharge),
          tempK = temp.water + 273) %>%
+  slice(-1) %>%
+  filter(!is.na(GPP))
+
+cbp <- mutate(cbp_miss, ER = zoo::na.approx(ER), na.rm = F) %>%
   filter(!is.na(ER))
 
 cbp %>%
@@ -222,6 +226,52 @@ cbp_ests%>%
 
 ```
 
+## Missing data model run on NHC data
+
+```{r, eval = FALSE}
+cbp_miss <- mutate(cbp_miss, miss_vec = ifelse(is.na(ER),1,0))
+
+stan_dat <- list(N = nrow(cbp_miss), R_obs = zoo::na.approx(cbp_miss$ER),
+                 P_obs = cbp_miss$GPP, tempK = cbp_miss$tempK, 
+                 Q = cbp_miss$discharge/max(cbp_miss$discharge), 
+                 litter = cbp_miss$litter, C0 = 200,
+                 miss_vec = cbp_miss$miss_vec)
+
+cbp_miss_mod <- stan('src/model/stan/ss_ER_missingdata.stan',
+                data = stan_dat, init = 0,
+                chains = 4, cores = 4,
+                warmup = 500, iter = 1000)
+
+```
+
+```{r, echo = FALSE}
+# saveRDS(cbp_miss_mod, 'src/model/model_runs/cbp_ss_ER_missingdata.rds')
+cbp_miss_mod <- readRDS('src/model/model_runs/cbp_ss_ER_missingdata.rds')
+print(cbp_miss_mod, pars = c('beta', 'sigma_obs', 'sigma_proc'))
+traceplot(cbp_miss_mod, ncol = 1, pars=c('beta', 'sigma_obs', 'sigma_proc'))
+```
+
+
+```{r}
+fit <- summary(cbp_miss_mod)
+modC <- fit$summary[4:363,1] 
+modC_sd <- fit$summary[4:363,3]
+mod_R <- -AR * cbp_miss$GPP - K20* exp(-E/k_b*(1/cbp_miss$tempK - 1/293)) * modC
+mod_R <- rnorm(length(mod_R), mod_R, fit$summary[3,1])
+
+cbp_ests <- cbp_miss %>%
+  mutate(C_modeled = modC, ER_modeled = mod_R, 
+         GPP_modeled = NA_real_, C_measured = NA_real_) %>%
+  rename(ER_measured = ER, GPP_measured = GPP) 
+cbp_ests%>%
+  pivot_longer(ends_with(c("_measured", "_modeled")), names_to = c('variable', 'est'),
+                         names_sep = '_', values_to = 'value') %>%
+  ggplot(aes(date, value, col = est)) +
+  geom_line() +
+  facet_wrap(.~variable, scales = 'free', ncol = 1)
+
+```
+
 
 
 ### Compare predictions today and in 1970
@@ -330,3 +380,4 @@ Most of the time, the carbon and ER estimates for 1969 are out of control becaus
 3. Fix discharge and eliminate unrealistic metabolism estimates
 4. Run across sites
 5. Add hierarchical variable to describe geomorphology across sites
+6. compare differenced ER timeseries with modeled.

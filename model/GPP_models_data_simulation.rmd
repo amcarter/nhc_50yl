@@ -9,6 +9,7 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = 'C:/Users/Alice Carter/git/nhc_50yl')
 setwd('C:/Users/Alice Carter/git/nhc_50yl')
 library(tidyverse)
+library(rstan)
 ```
 Task: build a basic hierarchical model of productivity as a function of light, temperature, and discharge.
 
@@ -16,9 +17,9 @@ Task: build a basic hierarchical model of productivity as a function of light, t
 
 To start, I will model productivity $P$ as an autoregressive function with terms for light ($l$), temp ($T$), and discharge ($Q$) included. If this proves insufficient, I will incorporate a latent biomass term.
 
-$$P_t = \phi P_{t-1} + \beta_1 l_t + \beta_2 T_t + \beta_3 log(Q_t) + \epsilon_t$$
+$$P_t = (\phi P_{t-1} + \beta_l l_t) \times (1 - \beta_q Q_t) \times e^{(\frac{1}{T_t} - \frac{1}{293})} + \epsilon_t$$
 $$\epsilon_t \sim N(0,\sigma_{proc})$$
-$$P_{obs,t} \sim N(P_t, sigma_{obs})$$
+$$P_{obs,t} \sim N(P_t, \sigma_{obs})$$
 Simulate some data based on real driver variables:
 
 ```{r}
@@ -31,76 +32,66 @@ drivers <- dat %>%
   mutate(across(-date, zoo::na.approx, na.rm = F),
          logQ = (log(discharge)),
          tQ = discharge/max(discharge, na.rm = T),
-         light = PAR_surface/max(PAR_surface, na.rm = T)) %>%
-  arrange(date)
-drivers <- drivers %>%
-  mutate(GPP_l = c(NA, GPP[1:(n()-1)] ))
+         light = PAR_surface/max(PAR_surface, na.rm = T),
+         tempK = temp.water+ 273) %>%
+  arrange(date) %>%
+  group_by(date) %>%
+  summarize(across(everything(), mean, na.rm = T)) %>%
+  mutate(across(any_of(c('tempK', 'tQ', 'light')), zoo::na.approx, na.rm = F)) %>%
+  slice(-1)
 
-phi = 0.949
-b_light = 0.0577
-# b_temp = 0.001
-b_q = 0.132
-sig_o = 0.05
-sig_p = 0.05
+phi = 0.9
+b_light = 0.1
+b_q = 0.8
+sig_obs = 0.05
+sig_proc = 0.05
 
 Phat = P = numeric()
-Phat[1] = P[1] = 1
+Phat[1] = P[1] = .5
 N = nrow(drivers)
 
 for (i in 2:N){
-  Phat[i] = phi *Phat[i-1] + b_light * drivers$light[i] 
-  P[i] = rnorm(1, Phat[i], sig_p)
+  Phat[i] = (phi *P[i-1] + b_light * drivers$light[i])*(1-b_q*drivers$tQ)*
+    exp(1/293 - 1/drivers$tempK) 
+  P[i] = rnorm(1, Phat[i], sig_proc)
   if(P[i] < 0) P[i] = 0
 }
 
-P_obs <- rnorm(N, P, sig_o)
+P_obs <- rnorm(N, P, sig_obs)
 
 plot(drivers$date, P_obs, ylim = c(0, 2))
 lines(drivers$date, drivers$GPP)
-lines(drivers$date, drivers$light, col = 2)
-lines(drivers$date, drivers$temp.water/2 + .7, col = 4)
-lines(drivers$date, drivers$logQ/3 + 1, col = 3)
-lines(drivers$date, drivers$LAI/3)
-plot(drivers$GPP, P_obs)
-abline(0,1)
-m <- lm(GPP ~ GPP_l + light, data = drivers)
 
-summary(m)
+```
+
+
+## Stan code
+
+```{r, comment='', echo = FALSE}
+cat(read_lines('src/model/stan/ss_GPP.stan'), sep = '\n')
 ```
 
 ```{r}
-## Growth Model 1 - Data simulation 
+stan_dat <- list(N = length(P_obs), P_obs = P_obs, light = drivers$light,
+                 tempK = drivers$tempK, Q = drivers$tQ)
 
-PM_AR <- function(phi, alpha, beta, sig_p, sig_o, df) {
-  ## Data
-  Ndays<-length(df$GPP)
-  GPP <- df$GPP
-  GPP_sd <- df$GPP_sd
-  light <- df$light
-  tQ <- df$tQ # discharge standardized to max value
-  
-  ## Vectors for model output
-  pred_GPP<-numeric(Ndays)
-  pred_GPP[1] <- GPP[1]
-  l_pred_GPP <- numeric(Ndays)
-  l_pred_GPP[1] <- log(GPP[1])
-  
-  ## Process model
-  for (j in 2:Ndays) {
-    l_pred_GPP[j] = MCMCglmm::rtnorm(1, mean=phi*l_pred_GPP[j-1] + alpha*light[j] + beta*tQ[j], sd = sig_p, upper=5)
-  }
-  
-  for (i in 2:Ndays){
-  pred_GPP[i] <- MCMCglmm::rtnorm(1, mean = exp(l_pred_GPP[i]), sd = sig_o, lower=0.01)
-  }
-  
-  return(pred_GPP)
-}
-
-
-PM_AR(phi, b_light, b_q, 0.1, 0.1, drivers)
+mod <- stan('src/model/stan/ss_GPP.stan', 
+            data = stan_dat, #init = 0,
+            chains = 4, cores = 4, 
+            warmup = 200, iter = 500)
 
 ```
+
+```{r, echo = FALSE}
+# saveRDS(mod, 'src/model/model_runs/simulated_ss_GPP.rds')
+mod <- readRDS('src/model/model_runs/simulated_ss_GPP.rds')
+print(mod, pars = c('phi', 'b_light','b_q',  'sigma_obs', 'sigma_proc'))
+traceplot(mod, ncol = 1, pars=c('phi','b_light', 'b_q', 'sigma_obs', 'sigma_proc'))
+plot_post_sim(mod, pars = c('phi', 'b_light', 'b_q', 'sigma_obs', 'sigma_proc'), 
+              vals = c(phi, b_light, b_q, sig_obs, sig_proc))
+```
+
+This model is not doing a good job of recovering the $\beta_q$ parameter
 
 ### Latent biomass model
 
