@@ -6,6 +6,8 @@ library(lubridate)
 setwd('C:/Users/Alice Carter/git/nhc_50yl/')
 sites <- read_csv('data/siteData/NHCsite_metadata.csv')
 
+
+# Compare Discharge across sites ####
 # read in NHC and UNHC discharge data:
 
 q <- read_csv('data/rating_curves/NHC_UNHC_Q.csv', guess_max = 10000) %>%
@@ -98,7 +100,7 @@ yy <- qq %>%
   summarize(discharge = sum(discharge, na.rm = T)) %>%
   rename(sitecode = site) %>% left_join(meds[,c(1,4)])
 
-ggplot(yy, aes(x = year, y = discharge, fill = site)) +
+ggplot(yy, aes(x = year, y = discharge, fill = sitecode)) +
   geom_bar(stat = 'identity', position = 'dodge')
 
 ggplot(yy, aes(x = ws_area.km2, y = discharge, col = factor(year))) + 

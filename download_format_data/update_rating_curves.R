@@ -137,6 +137,8 @@ levels <- levels %>%
   mutate(DateTime_EST = with_tz(DateTime_UTC, tz = "EST")) %>%
   arrange(DateTime_EST) 
 
+ggplot(levels, aes(NHC, UNHC, col = DateTime_UTC)) + geom_point()
+abline(c(0,1))
 # levels %>%
 #   select(-DateTime_EST) %>%
 #   xts(order.by = levels$DateTime_EST) %>%
@@ -157,7 +159,8 @@ nhc <- qql %>%
   filter(site =="NHC")
 
 # add a data point based on mannings equation:
-nhc <- data.frame(stage_m = 1.6, discharge = 9.81) %>% bind_rows(nhc)
+nhc <- data.frame(stage_m = 1.6, discharge = 9.81, site = 'NHC',
+                  notes = 'mannings eqn') %>% bind_rows(nhc)
 # nhc <- data.frame(stage_m = .64, discharge = 0.005) %>% bind_rows(nhc)
 
 unhc <- qql %>%
@@ -174,8 +177,10 @@ unhc <- unhc[-1,]
 plot(unhc$stage_m, unhc$discharge, log = 'xy')
 
 # add a data point based on mannings equation:
-unhc <- data.frame(stage_m = 1, discharge = 4.42) %>% bind_rows(unhc)
-unhc <- data.frame(stage_m = 1.4, discharge = 9.6) %>% bind_rows(unhc)
+unhc <- data.frame(stage_m = 1, discharge = 4.42, site = 'UNHC', 
+                   notes = 'mannings eqn') %>% bind_rows(unhc)
+# unhc <- data.frame(stage_m = 1.4, discharge = 9.6, site = 'UNHC',
+#                    notes = 'mannings eqn') %>% bind_rows(unhc)
 
 png('figures/ratingcurves_mannings.png', width = 480, height = 300)
 m <- lm(log(discharge)~log(stage_m), data = nhc)
@@ -188,10 +193,10 @@ plot(nhc$stage_m, nhc$discharge, xlim = c(.5, 1.7), ylab = 'discharge',
      xlab = 'NHC stage', col = 2)
 lines(seq(0,2, by = .01), exp(m_coef[1]) * seq(0,2, by = .01) ^ m_coef[2], col = 2)
 # remove mannings points
-nhc <- nhc[-1,]
-m <- lm(log(discharge)~log(stage_m), data = nhc)
+nhc_2 <- nhc[-1,]
+m <- lm(log(discharge)~log(stage_m), data = nhc_2)
 m_coef <- summary(m)$coefficients[,1]
-points(nhc$stage_m, nhc$discharge)
+points(nhc_2$stage_m, nhc_2$discharge)
 lines(seq(0,2, by = .01), exp(m_coef[1]) * seq(0,2, by = .01) ^ m_coef[2])
 legend('topleft', c('Measured', 'Manning\'s'), lty = c(1,1), col = c(1,2), bty = 'n')
 # par(new = T)
@@ -206,24 +211,29 @@ m_coef <- summary(m)$coefficients[,1]
 plot(unhc$stage_m, (unhc$discharge), xlim = c(.2, 1.5), #ylim = c(0,2), 
      ylab = 'discharge', xlab = 'UNHC stage', col = 2)
 lines(seq(0,2, by = .01), exp(m_coef[1]) * seq(0,2, by = .01) ^ m_coef[2], col = 2)
-unhc <- unhc[-c(1,2),]
-m <- lm(log(discharge)~log(stage_m), data = unhc)
+unhc_2 <- unhc[-c(1),]
+m <- lm(log(discharge)~log(stage_m), data = unhc_2)
 m_coef <- summary(m)$coefficients[,1]
 
-points(unhc$stage_m, unhc$discharge)
+points(unhc_2$stage_m, unhc_2$discharge)
 lines(seq(0,2, by = .01), exp(m_coef[1]) * seq(0,2, by = .01) ^ m_coef[2])
 
 # par(new = T)
 # plot(density((levels$UNHC), na.rm = T), col = 3, xlim = c(.2, 1.5), axes = F,
 #      xlab = '', ylab = '', main = "")
 par(new = T, mfrow = c(1,1))
-mtext("Distribution of level data compared to Rating Curves", 3, 1)
+mtext("Rating Curves with bankfull Manning's discharge measurements", 3, 1)
 dev.off()
 
-# add a data point based on mannings equation:
-nhc <- data.frame(stage_m = 1.6, discharge = 9.81) %>% bind_rows(nhc)
-unhc <- data.frame(stage_m = 1, discharge = 4.42) %>% bind_rows(unhc)
-unhc <- data.frame(stage_m = 1.4, discharge = 9.6) %>% bind_rows(unhc)
+# Read in data from the Wooden Bridge from Tim Covino:
+wb <- read_csv('data/rating_curves/covino_wb_ratingcurve.csv') 
+wb <- wb %>% mutate(date = as.Date(Datetime),
+              stage_m = level_cm/100,
+              discharge = discharge_ls/1000,
+              site = 'WB') %>%
+       select(date, site, stage_m, discharge, velocity_avg = velocity_ms, width = width_m)
+
+comb_rcs <- bind_rows(nhc, unhc, wb)
 
 build_powerlaw_rc <- function(l, q, site){
   m <- lm(log(q)~log(l))
@@ -246,6 +256,27 @@ ZQdat <- bind_rows(ZQdat, build_powerlaw_rc(nhc$stage_m, nhc$discharge, "NHC"))
 ZQdat$min_Q = 0 
 ZQdat$min_l = 0.64
 ZQdat <- bind_rows(ZQdat, build_powerlaw_rc(unhc$stage_m, unhc$discharge, "UNHC"))
+ZQdat <- bind_rows(ZQdat, build_powerlaw_rc(wb$stage_m, wb$discharge, "WB"))
+
+ZQdat <- ZQdat %>% 
+  mutate(level_at_0.025 = exp((log(0.025)-a) / b))
+comb_rcs %>% tibble() %>%
+  mutate(comp_level = case_when(site == 'NHC'~ stage_m - ZQdat$level_at_0.025[1],
+                                site == 'UNHC'~ stage_m - ZQdat$level_at_0.025[2],
+                                site == 'WB'~ stage_m - ZQdat$level_at_0.025[3])) %>%
+  ggplot(aes(comp_level, discharge, col = site)) +
+  geom_point() 
+
+plot(seq(0,2, by = .01) - ZQdat$level_at_0.025[1],
+     exp(ZQdat$a[1]) * seq(0,2, by = .01) ^ ZQdat$b[1], type = 'l', 
+     xlim = c(0,1.1), ylim = c(0,10), xlab = "relative level", ylab = 'Q')
+lines(seq(0,2, by = .01) - ZQdat$level_at_0.025[2], 
+      exp(ZQdat$a[2]) * seq(0,2, by = .01) ^ ZQdat$b[2], lty = 3)
+lines(seq(0,2, by = .01) - ZQdat$level_at_0.025[3],
+      exp(ZQdat$a[3]) * seq(0,2, by = .01) ^ ZQdat$b[3], lty = 2)
+legend('topleft', c('NHC', 'WB','UNHC'), lty = c(1,2,3), bty = 'n')
+mtext('Rating curves adjusted to relative levels')
+
 
 # Calculate discharge from rating curves ####
 # Q = a * level ^ b
@@ -282,20 +313,22 @@ ZQdat <- data.frame(site = c("NHC","UNHC"),
                         sum(qq$UNHC < ZQdat$min_l[2], na.rm = T)/nunhc)) %>% 
   left_join(ZQdat)
 
-write_csv(ZQdat, "data/rating_curves/modified_ZQ_curves2.csv")
+write_csv(ZQdat, "data/rating_curves/ZQ_curves_with_mannings.csv")
 
-good_flow_for_modeling_Q <-
-  qq %>% mutate(discharge_nhc = case_when(notes == 'nhc modeled' ~ NA_real_,
-                                        notes_rc == 'above NHC rc' ~ NA_real_,
-                                        TRUE ~ discharge_nhc),
-              discharge_unhc = case_when(notes == 'unhc modeled' ~ NA_real_,
-                                        notes_rc == 'above UNHC rc' ~ NA_real_,
-                                        TRUE ~ discharge_unhc)) %>%
-  dplyr::select(DateTime_UTC, discharge_nhc, discharge_unhc) %>%
-  filter(DateTime_UTC >= ymd_hms('2017-01-01 00:00:00'),
-         DateTime_UTC <= ymd_hms('2019-01-01 00:00:00'))
-write_csv(good_flow_for_modeling_Q, 
-          'data/rating_curves/NHC_UNHC_good_flow_years_for_Q_estimation.csv')
+# This chunk was used to pull out good flow data to use with a machine learning
+# approach to modeling discharge at these two sites.
+# good_flow_for_modeling_Q <-
+#   qq %>% mutate(discharge_nhc = case_when(notes == 'nhc modeled' ~ NA_real_,
+#                                         notes_rc == 'above NHC rc' ~ NA_real_,
+#                                         TRUE ~ discharge_nhc),
+#               discharge_unhc = case_when(notes == 'unhc modeled' ~ NA_real_,
+#                                         notes_rc == 'above UNHC rc' ~ NA_real_,
+#                                         TRUE ~ discharge_unhc)) %>%
+#   dplyr::select(DateTime_UTC, discharge_nhc, discharge_unhc) %>%
+#   filter(DateTime_UTC >= ymd_hms('2017-01-01 00:00:00'),
+#          DateTime_UTC <= ymd_hms('2019-01-01 00:00:00'))
+# write_csv(good_flow_for_modeling_Q, 
+#           'data/rating_curves/NHC_UNHC_good_flow_years_for_Q_estimation.csv')
 par(mfrow = c(1,1))
 plot(qq$discharge_unhc, qq$discharge_nhc,log = "xy",
      xlab = "unhc Q", ylab = "nhc Q", pch = 20)

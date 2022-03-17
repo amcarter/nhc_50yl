@@ -6,8 +6,9 @@ output: html_document
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = 'C:/Users/Alice Carter/git/nhc_50yl')
+knitr::opts_knit$set(root.dir = 'C:/Users/Alicei Carter/git/nhc_50yl')
 setwd('C:/Users/Alice Carter/git/nhc_50yl')
+source('../autotrophic_rivers/src/stan_helpers.R')
 library(tidyverse)
 library(rstan)
 ```
@@ -15,9 +16,10 @@ Task: build a basic hierarchical model of productivity as a function of light, t
 
 ### Initial model
 
-To start, I will model productivity $P$ as an autoregressive function with terms for light ($l$), temp ($T$), and discharge ($Q$) included. If this proves insufficient, I will incorporate a latent biomass term.
+Model productivity $P$ as a function of an underlying biomass term $(B)$ with light $(L)$ and temperature $(T)$ dependent photosynthetic rates and a biomass loss determined by discharge $(Q)$.
 
-$$P_t = (\phi P_{t-1} + \beta_l l_t) \times (1 - \beta_q Q_t) \times e^{(\frac{1}{T_t} - \frac{1}{293})} + \epsilon_t$$
+$$P_t = P_{20} \times L_t e^{B_t} \times e^{(\frac{E}{k_b} \times (\frac{1}{293} - \frac{1}{T_t}))}$$
+$$B_t = (B_{t-1} + r + \lambda e^{B_{t-1}}) \times (1 - \beta Q_t) + \epsilon_t$$
 $$\epsilon_t \sim N(0,\sigma_{proc})$$
 $$P_{obs,t} \sim N(P_t, \sigma_{obs})$$
 Simulate some data based on real driver variables:
@@ -40,28 +42,36 @@ drivers <- dat %>%
   mutate(across(any_of(c('tempK', 'tQ', 'light')), zoo::na.approx, na.rm = F)) %>%
   slice(-1)
 
-phi = 0.9
-b_light = 0.1
-b_q = 0.8
+beta = 0.8
+r = .06
+lambda = -.01
 sig_obs = 0.05
 sig_proc = 0.05
 
-Phat = P = numeric()
-Phat[1] = P[1] = .5
+E = 0.35
+k_b = 8.6173 * 10 ^ -5
+P_20 = 1
+
+B = numeric()
+pred_P = numeric()
+
+B[1] = rnorm(1, log(drivers$GPP[1]/drivers$light[1]), 1)
+pred_P[1] = drivers$light[1] * exp(B[1]) * P_20 * exp(E/k_b *( 1/293 - 1/drivers$tempK[1]))
+
 N = nrow(drivers)
 
 for (i in 2:N){
-  Phat[i] = (phi *P[i-1] + b_light * drivers$light[i])*(1-b_q*drivers$tQ)*
-    exp(1/293 - 1/drivers$tempK) 
-  P[i] = rnorm(1, Phat[i], sig_proc)
-  if(P[i] < 0) P[i] = 0
+  B[i] = rnorm(1, ((B[i-1] + r + lambda * exp(B[i-1])) * (1-beta*drivers$tQ[i])), sig_proc)
+  pred_P[i] = drivers$light[i] * exp(B[i]) * P_20 * exp(E/k_b *(1/293 - 1/drivers$tempK[i]))
 }
 
-P_obs <- rnorm(N, P, sig_obs)
+P_obs <- rnorm(N, pred_P, sig_obs)
 
-plot(drivers$date, P_obs, ylim = c(0, 2))
+plot(drivers$date, P_obs)
 lines(drivers$date, drivers$GPP)
 
+
+plot(drivers$date, B)
 ```
 
 
@@ -69,23 +79,38 @@ lines(drivers$date, drivers$GPP)
 
 ```{r, comment='', echo = FALSE}
 cat(read_lines('src/model/stan/ss_GPP.stan'), sep = '\n')
+cat(read_lines('src/model/stan/Stan_ProductivityModel2_Ricker_fixedinit_obserr.stan'), sep = '\n')
 ```
 
 ```{r}
-stan_dat <- list(N = length(P_obs), P_obs = P_obs, light = drivers$light,
+stan_dat <- list(N = nrow(drivers), P_obs = P_obs, light = drivers$light,
+                 tempK = drivers$tempK, Q = drivers$tQ)
+stan_dat <- list(N = nrow(drivers), P_obs = drivers$GPP, light = drivers$light,
                  tempK = drivers$tempK, Q = drivers$tQ)
 
 mod <- stan('src/model/stan/ss_GPP.stan', 
-            data = stan_dat, #init = 0,
+            data = stan_dat, init = 0,
+            chains = 1, cores = 4, 
+            warmup = 200, iter = 500)
+
+# try running Heili's ricker model
+
+stan_dat <- list(Ndays = nrow(drivers), light = drivers$light, GPP = drivers$GPP, 
+                 GPP_sd = drivers$GPP_sd,
+                 tQ = drivers$tQ)
+
+  mod <- stan('src/model/stan/Stan_ProductivityModel2_Ricker_fixedinit_obserr.stan', 
+            data = stan_dat,# init = 0,
             chains = 4, cores = 4, 
             warmup = 200, iter = 500)
 
 ```
 
 ```{r, echo = FALSE}
-# saveRDS(mod, 'src/model/model_runs/simulated_ss_GPP.rds')
+saveRDS(mod, 'src/model/model_runs/simulated_ss_GPP.rds')
 mod <- readRDS('src/model/model_runs/simulated_ss_GPP.rds')
-print(mod, pars = c('phi', 'b_light','b_q',  'sigma_obs', 'sigma_proc'))
+print(mod, pars = c( 'r','lambda',  'sig_p', 'sig_o'))
+print(mod, pars = c('beta', 'r','lambda',  'P_20', 'sigma_proc', 'sigma_obs'))
 traceplot(mod, ncol = 1, pars=c('phi','b_light', 'b_q', 'sigma_obs', 'sigma_proc'))
 plot_post_sim(mod, pars = c('phi', 'b_light', 'b_q', 'sigma_obs', 'sigma_proc'), 
               vals = c(phi, b_light, b_q, sig_obs, sig_proc))
