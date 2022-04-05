@@ -38,7 +38,7 @@ We will model respiration ($R$) as a function of the productivity ($P$), the car
 
 $K_t = K_{20} \times e^{\frac{-E}{k_b}(\frac{1}{T_t} - \frac{1}{293})}$
 
-$R_t = -AR \times P_t - C_t * K_t$
+$R_t = - AR \times P_t - C_t * K_t$
 
 $C_t = (C_{t-1} + P_{t-1} + L_t + R_{t-1}) \times (1 - \beta Q_t) \times \epsilon_t$
 

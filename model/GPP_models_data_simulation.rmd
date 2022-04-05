@@ -18,10 +18,13 @@ Task: build a basic hierarchical model of productivity as a function of light, t
 
 Model productivity $P$ as a function of an underlying biomass term $(B)$ with light $(L)$ and temperature $(T)$ dependent photosynthetic rates and a biomass loss determined by discharge $(Q)$.
 
-$$P_t = P_{20} \times L_t e^{B_t} \times e^{(\frac{E}{k_b} \times (\frac{1}{293} - \frac{1}{T_t}))}$$
-$$B_t = (B_{t-1} + r + \lambda e^{B_{t-1}}) \times (1 - \beta Q_t) + \epsilon_t$$
-$$\epsilon_t \sim N(0,\sigma_{proc})$$
-$$P_{obs,t} \sim N(P_t, \sigma_{obs})$$
+\[B_A(t+1) = B_A(t) + P(t) + AR(t) - L_A(t) - S_A(t) \]
+\[P(t) = P_{20} \times \theta_A ^ {T_t - 20} \frac{PAR_t}{PAR_t + K_{PAR}} \times B_A(t) \times (1 - \frac{B_a(t)}{K_{D,a}})\]
+\[AR(t) = AR_f \cdot P_t\]
+\[L_A(t) = \mu_L B_A(t)\]
+\[S_A(t) = \mu_s f_s(t) B_A(t)\]
+\[f_s(t) = (\frac{\tau(t) - \tau_0}{\tau_{max} - \tau_0})^2, \tau(t) = \gamma_wr(t)s\]
+
 Simulate some data based on real driver variables:
 
 ```{r}
@@ -41,6 +44,7 @@ drivers <- dat %>%
   summarize(across(everything(), mean, na.rm = T)) %>%
   mutate(across(any_of(c('tempK', 'tQ', 'light')), zoo::na.approx, na.rm = F)) %>%
   slice(-1)
+{(\frac{E}{k_b} \times (\frac{1}{293} - \frac{1}{T_t}))}$$$$B_t = (B_{t-1} + r + \lambda e^{B_{t-1}}) \times (1 - \beta Q_t) + \epsilon_t$$$$\epsilon_t \sim N(0,\sigma_{proc})$$$$P_{obs,t} \sim N(P_t, \sigma_{obs})$$
 
 beta = 0.8
 r = .06
