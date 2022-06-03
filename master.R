@@ -1,18 +1,19 @@
 #0. setup ####
-setwd('C:/Users/Alice Carter/git/nhc_50yl/')
+# setwd('C:/Users/Alice Carter/git/nhc_50yl/')
+setwd('C:/Users/alice.carter/git/nhc_50yl')
 source('src/helpers.R')
 library(lubridate)
 library(tidyverse)
 library(zoo)
 library(xts)
 library(dygraphs)
+# library(devtools)
+# install_github('streampulse/StreamPULSE', dependencies=TRUE)
+library(StreamPULSE)
 
   then_col = "brown3"
   now_col = "gray"
   fall_col = "brown3"
-# library(devtools)
-# install_github('streampulse/StreamPULSE', dependencies=TRUE)
-library(StreamPULSE)
 
 sites <- read_csv("data/siteData/NHCsite_metadata.csv") %>%
   slice(c(1:5,7))
@@ -66,17 +67,17 @@ source("src/download_format_data/prep_raw_SPdata.R")
 sites <- sites[c(1:5,7),]
   # plot daily metabolism estimates from stream metabolizer for all
   # sites in 2019 and NHC and UNHC in all years:
-  source("src/plot_data/plot_met_with_Q.R") 
+  source("src/plot_data/plot_met_with_Q.R")
   # generate bootstrapped CIs for direct calc estimates and plot
   # source("NHC_2019_metabolism/src/analyze_data/bootstrap_metabolism_comparison.R")
   source("src/analyze_data/bootstrap_metabolism_comparison_streamMetabolizer.R") #**
-  # plot variation in Met and P/R across scales 
+  # plot variation in Met and P/R across scales
     # updated version is for comparing Hall 72 data to modern stream metabolizer calcs
     # this file also builds the multipanel comparison across sites and years
-  source("src/plot_data/plot_direct_calc_met_results.R") 
+  source("src/plot_data/plot_direct_calc_met_results.R")
   # plot temp x ER and GPP relationships
   # this script generates figures 3, 4
-  source("src/analyze_data/calculate_Q10_SM_plot.R") 
+  source("src/analyze_data/calculate_Q10_SM_plot.R")
   # collect geomorphic driver variables, pair with metabolism, plot regressions
   # calculates slopes, r2, pvals for manuscript
     # plots from metabolism summary table - percent differences across scales
@@ -100,7 +101,7 @@ sites <- sites[c(1:5,7),]
   # plot land cover and terrestrial metabolism
   # source("src/plot_data/plot_riparian_NPP_LAI.R") # not this one
   # source("src/plots/plot_watershed_landcover.R")
-  
+
   # summarize temperature, discharge, and DO across all metabolism site years
     # quantify hypoxia, compare drivers to met at annual timescale
     source('src/analyze_data/summarize_physical_met_drivers.R')
@@ -115,6 +116,6 @@ sites <- sites[c(1:5,7),]
 # # this section is no longer in use - see old git repo to run this
 # # a. calculate k based on Churchill 1962 equation
 # source("hall_50yl/code/src/analysis/calculate_k_from_hall_eq.R")
-# 
+#
 # # b. model metabolism following Hall 1970 method
 # source("hall_50yl/code/src/analysis/model_metabolism_hall_method.R")
