@@ -7,7 +7,7 @@
 # 1) Calculate depth from the water pressure and air pressure data
 # 2) remove sensor offsets created by gaps  that are less than 3 hrs
 #       by vertically snapping across gaps (usually caused by sensor out of water)
-# 3) Correct level data using field based depth measurements
+# 3) Correct level data iusing field based depth measurements
 
 # Setup ####
 library(lubridate)
@@ -103,9 +103,11 @@ dat <- dat %>%
              lvl_stop = dat$level_m[stops],
              jump = lvl_stop - lvl_start) %>%
       filter(abs(jump) >= 0.01,
-             lengths < 10 | starts == 121116) %>%
+             lengths < 10 | starts == 121060) %>%
       arrange(starts)
     n <- nrow(dat)
+    dat$level_m1 <- dat$level_m
+    plot_pres( dat, 'level_m', 'waterdepth_m', 'level_m1')
     for(i in 1:(nrow(tmp))){
       if(i == nrow(tmp)){
         dat$level_m[tmp$stops[i]:n] <- dat$level_m[tmp$stops[i]:n] -
@@ -164,8 +166,7 @@ dat <- dat %>%
         slice(-36,-42)%>%
         arrange(starts)
     n <- nrow(dat)
-    dat$level_m1 <- dat$level_m
-    plot_pres( dat, 'level_m', 'waterdepth_m', 'level_m1')
+    # dat$level_m1 <- dat$level_m
 
     for(i in 1:(nrow(tmp))){
       if(i == nrow(tmp)){
@@ -177,7 +178,10 @@ dat <- dat %>%
     }
     tmp <- gaps %>%
         filter(values == 1,
-               lengths > 300) %>% slice(-4)
+               # lengths > 300|starts ==27929) %>%
+               lengths > 300|starts %in% c(27929, 44759)) %>%
+               # lengths > 300|starts %in% c(27929, 32816, 44759)) %>%
+        slice(-6)
     for(i in 1:(nrow(tmp)+1)){
         if(i == 1){ start = 1 } else {start = tmp$stops[i - 1]}
         if(i == (nrow(tmp)+1)){stop = n} else {stop = tmp$starts[i]}
@@ -186,6 +190,8 @@ dat <- dat %>%
         if(is.na(delta)) { next }
         dat$level_m[start:stop] <- dat$level_m[start:stop] - delta
     }
+    # plot_pres( dat, 'level_m', 'waterdepth_m', 'level_nhc')
+    # plot_pres( dat, 'level_m', 'waterdepth_m', 'level_m1')
     dat <- select(dat, -level_nhc)
   }
   if(dat$site[1] == "PM"){

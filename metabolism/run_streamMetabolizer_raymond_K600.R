@@ -2,7 +2,7 @@
 # adapted from JRB script
 # This version runs metabolism on NHC sites using the K600 values from Hall 1972
 
-# update.packages(oldPkgs=c("streamMetabolizer","unitted"), dependencies=TRUE, 
+# update.packages(oldPkgs=c("streamMetabolizer","unitted"), dependencies=TRUE,
 #                 repos=c("http://owi.usgs.gov/R", "https://cran.rstudio.com"))
 # devtools::install_github("USGS-R/streamMetabolizer", ref="develop")
 
@@ -15,7 +15,7 @@ library(dygraphs)
 # library(imputeTS)
 # library(parallel)
 
-setwd("C:/Users/Alice Carter/git/nhc_50yl/NHC_2019_metabolism/data")
+setwd("C:/Users/alice.carter/git/nhc_50yl/data")
 # setwd("~Desktop/donkey")
 ## Read in Data ####
 sites <- read_csv("siteData/NHCsite_metadata.csv") %>%
@@ -39,7 +39,7 @@ UNHC <- read_metdata("UNHC")
 
 # # Visualize the data #####
 # dat <- CBP
-# 
+#
 # dat %>% unitted::v() %>%
 #   mutate(DO.pctsat = 100 * (DO.obs / DO.sat)) %>%
 #   select(solar.time, starts_with('DO')) %>%
@@ -48,7 +48,7 @@ UNHC <- read_metdata("UNHC")
 #   ggplot(aes(x=solar.time, y=DO.value, color=type)) + geom_line() +
 #   facet_grid(units ~ ., scale='free_y') + theme_bw() +
 #   scale_color_discrete('variable')
-# 
+#
 # labels <- c(depth='depth\n(m)', temp.water='water temp\n(deg C)',
 #             light='PAR\n(umol m^-2 s^-1)', discharge='Q\n(cms)')
 # dat %>% unitted::v() %>%
@@ -64,14 +64,14 @@ UNHC <- read_metdata("UNHC")
 
 
 ## Set bayes specs #####
-bayes_name <- mm_name(type='bayes', pool_K600="binned", 
-                          err_obs_iid=TRUE, err_proc_iid = TRUE, 
-                          ode_method = "trapezoid", deficit_src='DO_mod', 
+bayes_name <- mm_name(type='bayes', pool_K600="binned",
+                          err_obs_iid=TRUE, err_proc_iid = TRUE,
+                          ode_method = "trapezoid", deficit_src='DO_mod',
                           engine='stan')
 
 
 set_up_model <- function(dat, bayes_name, site, one = T){
-  
+
   ## Set bayes specs
   bayes_specs <- specs(bayes_name)
   bayes_specs$keep_mcmc_data <- FALSE
@@ -86,7 +86,7 @@ set_up_model <- function(dat, bayes_name, site, one = T){
   while(delta > 1){
     n = n + 1
     delta <- (Qrng[2]-Qrng[1])/n
-  }  
+  }
   nodes <- seq(Qrng[1], Qrng[2], length = n)
   ## Based on Pete Raymond's data
   slope <- sites[sites$sitecode==site, ]$slope
@@ -105,53 +105,53 @@ set_up_model <- function(dat, bayes_name, site, one = T){
   }
   bayes_specs$K600_lnQ_nodes_centers <- nodes
   bayes_specs$K600_lnQ_nodes_sdlog <- c(rep(0.7, 7))
-  
+
   return(bayes_specs)
 }
 
 dir.create('data/metabolism/modeled/finalQ')
 # Model Runs ####
-# CBP 
+# CBP
 bayes_specs <- set_up_model(CBP, bayes_name, "CBP", one = F)
 fit <- metab(bayes_specs, CBP)
 saveRDS(fit, "metabolism/modeled/finalQ/fit_cbp_uninformed_raymond_K.rds")
 rm(fit)
 gc()
 
-# PM 
+# PM
 bayes_specs <- set_up_model(PM, bayes_name, "PM", one = F)
 fit <- metab(bayes_specs, PM)
 saveRDS(fit, "metabolism/modeled/finalQ/fit_pm_uninformed_raymond_K.rds")
 rm(fit)
 gc()
 
-# WB 
+# WB
 bayes_specs <- set_up_model(WB, bayes_name, "WB", one = F)
 fit <- metab(bayes_specs, WB)
 saveRDS(fit, "metabolism/modeled/finalQ/fit_wb_uninformed_raymond_K.rds")
 rm(fit)
 gc()
 
-# WBP 
+# WBP
 bayes_specs <- set_up_model(WBP, bayes_name, "WBP", one = F)
 fit <- metab(bayes_specs, WBP)
 saveRDS(fit, "metabolism/modeled/finalQ/fit_wbp_uninformed_raymond_K.rds")
 rm(fit)
 gc()
 
-# PWC 
+# PWC
 bayes_specs <- set_up_model(PWC, bayes_name, "PWC", one = F)
 fit <- metab(bayes_specs, PWC)
 saveRDS(fit, "metabolism/modeled/finalQ/fit_pwc_uninformed_raymond_K.rds")
 rm(fit)
 gc()
 
-# NHC 
+# NHC
 for(i in 2017:2019){
   dd = ymd_hms(paste0(i,"-03-01 04:00:00"))
   n = 365*24*60*60
   if(i == 2019) { n = (365 + 25) *24*60*60}
-  dat <- NHC %>% 
+  dat <- NHC %>%
     filter(solar.time >= dd,
            solar.time <= dd + n)
   bayes_specs <- set_up_model(dat, bayes_name, "NHC", one = F)
@@ -161,12 +161,12 @@ for(i in 2017:2019){
   rm(fit)
   gc()
 }
-# UNHC 
+# UNHC
 for(i in 2017:2019){
   dd = ymd_hms(paste0((i),"-03-01 04:00:00"))
   n = 365*24*60*60
   if(i == 2019) { n = (365 + 25) *24*60*60}
-  dat <- UNHC %>% 
+  dat <- UNHC %>%
     filter(solar.time >= dd,
            solar.time <= dd + n)
   bayes_specs <- set_up_model(dat, bayes_name, "UNHC", one = F)
