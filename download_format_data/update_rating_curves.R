@@ -363,17 +363,17 @@ for(i in which(!is.na(newQdat$NHC.Q))){
   if(i %% 5000 == 0) { print(i/nrow(newQdat))}
 }
 
-newQdat %>% filter(DateTime_UTC >= ymd_hms('2017-03-01 00:00:00')) %>%
+Q <- newQdat %>% filter(DateTime_UTC >= ymd_hms('2017-03-01 00:00:00')) %>%
     select(-PWC.Q) %>%
     mutate(notes_rc = case_when(notes_rc == 'above NHC rc'|notes_rc == 'above UNHC rc' ~
                                     'Above RC',
                                 TRUE ~ NA_character_)) %>%
-    pivot_longer(ends_with('.Q'), names_to = 'site', values_to = 'discharge') %>%
-    ggplot(aes(DateTime_UTC, log(discharge), col = notes_rc))+
-    geom_point() + facet_wrap(.~site, scales = 'free_x', ncol = 2)
+    pivot_longer(ends_with('.Q'), names_to = 'site',
+                 names_pattern = '^([a-zA-Z]+).Q$',
+                 values_to = 'discharge')
 
 write_csv(newQdat, "data/rating_curves/interpolatedQ_allsites.csv")
-
+write_csv(Q, 'data/rating_curves/interpolatedQ_allsites_long.csv')
 # filter high flow days and impossible values #
 deltaQ_max = 2
 RC <- ZQdat
