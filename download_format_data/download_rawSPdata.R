@@ -20,7 +20,7 @@ for(i in 1:nrow(sites)){
     query_available_data("NC",sites[i,]$sitecode)$variables))
   dat <- request_data(sites[i,]$siteID,
                       startdate = as.Date(sites[i,]$startdate.UTC),
-                      enddate = as.Date("2020-03-21"),
+                      enddate = as.Date("2020-03-25"),
                       variables=vars)
   dd <- dat$data %>%
     mutate(value = ifelse(flagtype %in% c("Bad Data", "Questionable"),

@@ -148,7 +148,7 @@ plot(qql$stage_m, qql$level_m, col = p_col, pch = 20,
 abline(0,1)
 legend('topleft', c('NHC_0', 'NHC_8.5'), col = c('aquamarine4', 'aquamarine2'),
        pch = 20, bty = 'n', inset = .05)
-identify(qql$stage_m, qql$level_m, labels = qql$date)
+# identify(qql$stage_m, qql$level_m, labels = qql$date)
 # the stages on 9/22/2016 are much higher than the levels at both sites,
 # but the plot below suggests that that is a problem with the level data,
 # not the stage, so I am leaving them in to calculate rating curves.
@@ -298,11 +298,11 @@ write_csv(ZQpoints, "data/rating_curves/ZQ_points_with_mannings.csv")
 # plot(qq$discharge_unhc, qq$discharge_nhc,log = "xy",
 #      xlab = "unhc Q", ylab = "nhc Q", pch = 20)
 # abline(0,1)
-qq %>%
-  mutate(month = month(DateTime_EST)) %>%
-  filter(DateTime_UTC > ymd_hms('2017-03-01 00:00:00')) %>%
-ggplot(aes(log(discharge_unhc), log(discharge_nhc), col = factor(month))) +
-  geom_point() +geom_abline(intercept = 0, slope = 1)
+# qq %>%
+#   mutate(month = month(DateTime_EST)) %>%
+#   filter(DateTime_UTC > ymd_hms('2017-03-01 00:00:00')) %>%
+# ggplot(aes(log(discharge_unhc), log(discharge_nhc), col = factor(month))) +
+#   geom_point() +geom_abline(intercept = 0, slope = 1)
 
 qq_long <- qq %>% rename(level_nhc = NHC, level_unhc = UNHC) %>%
     pivot_longer(starts_with(c('level', 'discharge')),
@@ -321,8 +321,8 @@ qq_long <- qq %>% rename(level_nhc = NHC, level_unhc = UNHC) %>%
                                 TRUE ~ NA_character_))
 
 
-ggplot(qq_long, aes(DateTime_EST, log(discharge), col = notes_rc)) +
-    geom_point() + facet_wrap(.~site, ncol = 1)
+# ggplot(qq_long, aes(DateTime_EST, log(discharge), col = notes_rc)) +
+#     geom_point() + facet_wrap(.~site, ncol = 1)
 # Interpolate discharge ####
 write_csv(qq, "data/rating_curves/NHC_UNHC_Q.csv")
 write_csv(qq_long, "data/rating_curves/NHC_UNHC_Q_long.csv")

@@ -41,16 +41,16 @@ plot_pres <- function(NHC, waterpres = "level_m", airpres = "waterdepth_m",
 }
 
 # 2. Load Data ####
-# # get airpressure data: This only needs to be rerun if the date window has changed
+# get airpressure data: This only needs to be rerun if the date window has changed
 # NOAA_airpres <- StreamPULSE:::FindandCollect_airpres(sites$latitude[1],
 #                                                      sites$longitude[1],
 #                                                      ymd_hms("2016-07-14 00:00:00"),
 #                                                      ymd_hms("2022-01-01 00:00:00"))
-# NHC <- read_csv("data/metabolism/raw/NHC_2020-03-20.csv") %>%
+# NHC <- read_csv("data/metabolism/raw/NHC_2020-03-24.csv") %>%
 #   select(DateTime_UTC, AirPres_kPa) %>%
 #   right_join(NOAA_airpres)
-# # there is a systematic offsett from the air pressure measured at our site and the NOAA air pressure,
-# # here we correct for this:
+# # there is a systematic offsett from the air pressure measured at our site and
+# # the NOAA air pressure, here we correct for this:
 # NOAA_airpres <- NHC %>%
 #   mutate(air_kPa = air_kPa -
 #            mean(NHC$air_kPa - NHC$AirPres_kPa, na.rm = T)) %>%
