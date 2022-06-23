@@ -80,7 +80,7 @@ sites <- sites[c(1:5,7),]
   # collect geomorphic driver variables, pair with metabolism, plot regressions
   # calculates slopes, r2, pvals for manuscript
     # plots from metabolism summary table - percent differences across scales
-    source('src/plot_data/plot_met_summary_dat.R')
+ ******   source('src/plot_data/plot_met_summary_dat.R')
 
 
 #4. Process Hall 1970 data: ####

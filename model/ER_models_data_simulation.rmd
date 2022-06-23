@@ -6,8 +6,8 @@ output: html_document
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = 'C:/Users/Alice Carter/git/nhc_50yl')
-setwd('C:/Users/Alice Carter/git/nhc_50yl/')
+knitr::opts_knit$set(root.dir = 'C:/Users/alice.carter/git/nhc_50yl')
+setwd('C:/Users/alice.carter/git/nhc_50yl/')
 source('../autotrophic_rivers/src/stan_helpers.R')
 library(tidyverse)
 library(rstan)
@@ -61,8 +61,10 @@ Use real input data to simulate ER and GPP:
 ```{r, echo = FALSE}
 
 # define litterfall to be 20 days from Oct 5th - 24th with the total annual litter = 500 gC/m2/y, so daily litterfall = 25 gC/m2/d
-cbp_miss <- dat %>%
-  filter(site == 'CBP') %>%
+cbp <- dat %>%
+    filter(site == 'CBP') %>%
+    mutate(ER = ifelse(ER < -4, NA, ER))
+cbp_miss <- cbp %>%
   select(-site) %>%
   arrange(date) %>%
   mutate(across(c(-date, -ER), zoo::na.approx, na.rm = F),
@@ -78,7 +80,7 @@ cbp <- mutate(cbp_miss, ER = zoo::na.approx(ER), na.rm = F) %>%
   filter(!is.na(ER))
 
 cbp %>%
-  select(date, temp = temp.water, logQ, light = PAR_surface, litter) %>%
+  select(date, temp = temp.water, logQ, light = PAR_surface, litter, GPP, ER) %>%
   pivot_longer(-date, names_to = 'variable', values_to = 'value') %>%
   ggplot(aes(date, value, col = variable)) +
   geom_line() +
@@ -161,14 +163,14 @@ mod2 <- stan('src/model/stan/ss_ER.stan',
 # saveRDS(mod2, 'src/model/model_runs/simulated_ss_ER.rds')
 mod2 <- readRDS('src/model/model_runs/simulated_ss_ER.rds')
 print(mod2, pars = c('beta', 'sigma_obs', 'sigma_proc'))
-traceplot(mod2, ncol = 1, pars=c('beta', 'sigma_obs', 'sigma_proc'))
+# traceplot(mod2, ncol = 1, pars=c('beta', 'sigma_obs', 'sigma_proc'))
 plot_post_sim(mod2, pars = c('beta', 'sigma_obs', 'sigma_proc'), 
-              vals = c(beta, sigma_obs, sigma_proc))
+              vals = c(beta, sigma_obs, sigma_proc), xlim = c(0,1))
 ```
 
 
 
-```{r}
+```{r, include = FALSE, echo = FALSE, eval = FALSE}
 fit <- summary(mod2)
 modC <- fit$summary[4:363,1] 
 modC_sd <- fit$summary[4:363,3]
@@ -370,7 +372,7 @@ comp %>%
   facet_wrap(.~variable, scales = 'free_y', nrow = 3)
 ```
 
-Most of the time, the carbon and ER estimates for 1969 are out of control because the process error is so high. I think that removing some erroneous respiration estimates (like the spring spike that coincides with a large storm) will help correct this.
+Most of the time, the carbon and ER estimates for 1969 are out of control because the process error is so high. 
 
 
 

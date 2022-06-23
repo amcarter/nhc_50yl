@@ -6,8 +6,8 @@ output: html_document
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = 'C:/Users/Alicei Carter/git/nhc_50yl')
-setwd('C:/Users/Alice Carter/git/nhc_50yl')
+knitr::opts_knit$set(root.dir = 'C:/Users/alice.carter/git/nhc_50yl')
+setwd('C:/Users/alice.carter/git/nhc_50yl')
 source('../autotrophic_rivers/src/stan_helpers.R')
 library(tidyverse)
 library(rstan)
@@ -44,7 +44,6 @@ drivers <- dat %>%
   summarize(across(everything(), mean, na.rm = T)) %>%
   mutate(across(any_of(c('tempK', 'tQ', 'light')), zoo::na.approx, na.rm = F)) %>%
   slice(-1)
-{(\frac{E}{k_b} \times (\frac{1}{293} - \frac{1}{T_t}))}$$$$B_t = (B_{t-1} + r + \lambda e^{B_{t-1}}) \times (1 - \beta Q_t) + \epsilon_t$$$$\epsilon_t \sim N(0,\sigma_{proc})$$$$P_{obs,t} \sim N(P_t, \sigma_{obs})$$
 
 beta = 0.8
 r = .06

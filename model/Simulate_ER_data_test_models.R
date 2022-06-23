@@ -1,22 +1,22 @@
 # Script for simulating data and running different versions of ER models
 # A Carter
 # Feb 2022
-setwd('C:/Users/Alice Carter/git/nhc_50yl/')
+setwd('C:/Users/alice.carter/git/nhc_50yl/')
 library(tidyverse)
 library(rstan)
 
 # Load data ####
 # Use real driver data from the CBP station
 
-# dat <- read_csv('data/metabolism/metabolism_and_drivers.csv')
-# 
-# met <- dat %>%
-#   arrange(site, date) %>% 
-#   select(site, date, starts_with(c('ER', 'GPP')), temp.water, 
-#          discharge, PAR_surface) %>%
-#   group_by(site, date) %>%
-#   summarize(across(everything(), mean, na.rm = T)) %>%
-#   ungroup() 
+dat <- read_csv('data/metabolism/metabolism_and_drivers.csv')
+
+met <- dat %>%
+  arrange(site, date) %>%
+  select(site, date, starts_with(c('ER', 'GPP')), temp.water,
+         discharge, PAR_surface, depth) %>%
+  group_by(site, date) %>%
+  summarize(across(everything(), mean, na.rm = T)) %>%
+  ungroup()
 
 write_csv(met, 'data/met_and_drivers_for_model.csv')
 
@@ -29,7 +29,7 @@ cbp <- dat %>%
   select(-site) %>%
   arrange(date) %>%
   mutate(across(-date, zoo::na.approx, na.rm = F),
-         litter = case_when(date >= as.Date('2019-10-05') & 
+         litter = case_when(date >= as.Date('2019-10-05') &
                               date <= as.Date('2019-10-24') ~ 25,
                             TRUE ~ 0),
          logQ = log(discharge),
@@ -47,7 +47,7 @@ cbp %>%
 mean(cbp$GPP.upper- cbp$GPP.lower)/4
 sd((cbp$GPP.upper- cbp$GPP.lower)/4)
 
-# Simulate data 
+# Simulate data
 N <- nrow(cbp)
 light = cbp$PAR_surface/max(cbp$PAR_surface)
 Q = cbp$discharge/max(cbp$discharge)
@@ -60,7 +60,7 @@ P[1] = 0.5
 for(i in 2:N){
   P[i] = 0.5 * P[i-1] + 0.8 * light[i] + rnorm(1,0, 0.05)
 }
-  
+
 # Load Hall driver data for testing hindcast (with simulations)
 **** Load Hall data
 
@@ -69,7 +69,7 @@ for(i in 2:N){
 # ER_base_model_1.stan
 
 # define parameters
-b1 = .5 * 10e8 # I can only get a measurable amount of heterotrophic respiration with an extremely high b1 
+b1 = .5 * 10e8 # I can only get a measurable amount of heterotrophic respiration with an extremely high b1
 b2 = .8
 E = 0.63
 sigma_proc = 0.1
@@ -107,9 +107,9 @@ stan_dat <- list(N = length(R_obs), R_obs = R_obs, P_obs = P,
 stan_dat <- list(N = length(R_obs), R_obs = R_obs, P_obs = P,
                  tempK = temp, C = C)
 
-mod <- stan('src/model/stan/ER_base_model_1.stan', 
+mod <- stan('src/model/stan/ER_base_model_1.stan',
             data = stan_dat,
-            chains = 4, init = 0, 
+            chains = 4, init = 0,
             warmup = 500, iter = 1000)
 
 
@@ -122,7 +122,7 @@ saveRDS(mod, 'src/model/model_runs/simulated_ER_base_mod_1.rds')
 R20 = .01  # Heterotrophic respiration at 20 C
 beta = 0.8   # Percent removal of organic carbon from max storm
 sigma_proc = 0.1
-sigma_obs = 0.08 
+sigma_obs = 0.08
 
 # Constants
 E = 0.63              # activation energy for heterotrophic respiration
@@ -138,7 +138,7 @@ C[1] = 100 # initial accessible carbon storage in stream
 R[1] = AR * P[1] + (1 - exp(-R20 * exp(-E/k_b * (1/temp[1] - 1/293)))) * C[1]
 
 for(i in 2:N){
-  C[i] = (C[i-1] + litter[i] - R[i-1] + P[i-1])*(1-beta*Q[i]) + 
+  C[i] = (C[i-1] + litter[i] - R[i-1] + P[i-1])*(1-beta*Q[i]) +
     rnorm(1, 0, sigma_proc)
   if(C[i]<5) C[i] = 5
   R[i] = AR * P[i] + (1 - exp(-R20 * exp(-E/k_b * (1/temp[i] - 1/293))))*C[i]
@@ -157,7 +157,7 @@ data.frame(date = cbp$date, P = P, R = R_obs, C = C) %>%
 stan_dat <- list(N = length(R_obs), R_obs = R_obs, P_obs = P,
                  tempK = temp, C = C)
 
-mod <- stan('src/model/stan/ER_base_model_2.stan', 
+mod <- stan('src/model/stan/ER_base_model_2.stan',
             data = stan_dat, init = 0,
             chains = 4, cores = 4,
             warmup = 200, iter = 500)

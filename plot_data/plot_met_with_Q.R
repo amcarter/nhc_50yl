@@ -3,9 +3,9 @@ library(pracma)
 source("src/metabolism/inspect_model_fits.r")
 
 
-dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer.rds")
+dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_C.rds")
 
-preds_19 <- dat$preds %>% 
+preds_19 <- dat$preds %>%
   filter(year == 2019)
 preds_nhc <- dat$preds %>%
   filter(site %in% c("NHC", "UNHC"))
@@ -45,34 +45,35 @@ tiff("figures/metQ_across_sites_SM_2019.tif",
       arrange(date)
 
     tmpq <- qq[,c(1, s+1)] %>%
-      filter(date >= xlim[1], 
+      filter(date >= xlim[1],
              date <= xlim[2])
     colnames(tmpq) <- c('date', 'discharge')
     plot_metab(tmp, ylim = ylim, xlim = xlim, xaxt = 'n', yaxt = 'n')
     if(s %in% c(4,5,6)) {
       axis(2, cex.axis = axis_size, at = c(-6, -3, 0, 3))
-    } 
+    }
     if(s %in% c(1,4)){
       axis(1, at = seq(as.Date('2019-03-01'), by = 'month', length.out = 13),
            labels = month.abb[c(3:12, 1:3)], cex.axis = axis_size, las = 2)
       # axis(1, at = seq(as.Date('2019-03-01'), by = '2 months', length.out = 7),
       #      labels = month.abb[c(3,5,7,9,11,1,3)])
-    } 
+    }
     par(new = T)
     plot(tmpq$date, tmpq$discharge, log = "y", type = "l", ylim = Qlim, xlim = xlim,
          axes = FALSE, xlab = '', ylab = '')
     mtext(sn, cex = 0.8, line = -1.2, adj = 0.02)
     if(s %in% c(1,2,3)){
-      axis(4, cex.axis = axis_size, at = c(0.01, 1, 100), 
+      axis(4, cex.axis = axis_size, at = c(0.01, 1, 100),
            labels = c(0.01, 1, 100), las = 2)
-    } 
+    }
   }
   par(new = T, mfrow = c(1,1), oma = c(1,2,0,2))
   plot(1,1, axes = F, ann = F, type = 'n')
-  mtext("Metabolism gC/m2/d", 2, 1, cex = 0.9)
-  mtext("Discharge (m3/s)", 4, 1, cex = 0.9)
+  mtext(expression(paste("Metabolism g C/", m^2, "/d")), 2, .9, cex = 0.9)
+  mtext(expression(paste("Discharge (", m^3, "/s)")), 4, 1, cex = 0.9)
   # mtext("Date", 1, 2.5)
-  mtext("A. New Hope Creek metabolism across sites in 2019", 3, -2.5)
+  mtext("New Hope Creek metabolism across sites in 2019", 3, -2.5)
+  mtext('A', 3, -2.5, adj = 0)
 dev.off()
 
 # png("figures/metQ_across_years_SM_2019.png",
@@ -91,22 +92,22 @@ tiff("figures/metQ_across_years_SM_2019.tif",
       filter(site == "UNHC",
              year == y)
     tmpq <- qq[,c(1, 7)] %>%
-      filter(date >= xlim[1], 
+      filter(date >= xlim[1],
              date <= xlim[2])
     colnames(tmpq) <- c('date', 'discharge')
     plot_metab(tmp, ylim = ylim, xlim = xlim, xaxt = 'n', yaxt = 'n')
     axis(2, cex.axis = axis_size, at = c(-6, -3, 0, 3))
     if(y == 2018){
       abline(v = florence, lty = 2)
-      # text(x = florence, y = -8.5, labels = "Hurricane Florence", 
+      # text(x = florence, y = -8.5, labels = "Hurricane Florence",
       #      cex = axis_size, pos = 4)
     }
     if(y == 2019){
       axis(1, at = seq(as.Date('2019-03-01'), by = 'month', length.out = 13),
            cex.axis = axis_size, labels = month.abb[c(3:12, 1:3)], las = 2)
-      mtext("Upstream (0 km)",1, line = 2.5, cex = 0.9) 
-      
-    } 
+      mtext("Upstream (0 km)",1, line = 2.5, cex = 0.9)
+
+    }
     par(new = T)
     plot(tmpq$date, tmpq$discharge, log = "y", type = "l", ylim = Qlim, xlim = xlim,
          axes = FALSE, xlab = '', ylab = '')
@@ -116,7 +117,7 @@ tiff("figures/metQ_across_years_SM_2019.tif",
       filter(site == "NHC",
              year == y)
     tmpq <- qq[,c(1, 2)] %>%
-      filter(date >= xlim[1], 
+      filter(date >= xlim[1],
              date <= xlim[2])
     colnames(tmpq) <- c('date', 'discharge')
     plot_metab(tmp, ylim = ylim, xlim = xlim, xaxt = 'n', yaxt = 'n')
@@ -128,21 +129,22 @@ tiff("figures/metQ_across_years_SM_2019.tif",
     if(y == 2019){
       axis(1, at = seq(as.Date('2019-03-01'), by = 'month', length.out = 13),
            cex.axis = axis_size, labels = month.abb[c(3:12, 1:3)], las = 2)
-      mtext("Downstream (8.5 km)",1, line =2.5, cex = 0.9) 
-    } 
+      mtext("Downstream (8.5 km)",1, line =2.5, cex = 0.9)
+    }
     par(new = T)
     plot(tmpq$date, tmpq$discharge, log = "y", type = "l", ylim = Qlim, xlim = xlim,
          axes = FALSE, xlab = '', ylab = '')
     mtext(y, cex = 0.8, line = -1.2, adj = 0.02)
-    axis(4, cex.axis = axis_size, at = c(0.01, 1, 100), 
+    axis(4, cex.axis = axis_size, at = c(0.01, 1, 100),
          labels = c(0.01, 1, 100), las = 2)
     xlim = xlim + 365
   }
   par(new = T, mfrow = c(1,1), oma = c(1,2,0,2))
   plot(1,1, axes = F, ann = F, type = 'n')
-  mtext("Metabolism gC/m2/d", 2, 1, cex = .9)
-  mtext("Discharge (m3/s)", 4, 1, cex = .9)
+  mtext(expression(paste("Metabolism g C/", m^2, "/d")), 2, .9, cex = .9)
+  mtext(expression(paste("Discharge (", m^3, "/s)")), 4, 1, cex = .9)
   # mtext("Date", 1, 2.5)
-  mtext("B. New Hope Creek metabolism across years", 3, -2.5)
+  mtext("New Hope Creek metabolism across years", 3, -2.5)
+  mtext('B', 3, -2.5, adj = 0)
 dev.off()
 

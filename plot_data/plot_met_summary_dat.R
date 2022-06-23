@@ -7,24 +7,24 @@ dat <- read_csv("data/metabolism/compiled/metabolism_summary_table_gC.csv") %>%
 # seasonal distribution of peak metabolism ####
 
 sum <- dat %>% filter(year != 1969, year != 2020, site != 'PWC') %>%
-  mutate(across(starts_with('peak'), ~as.numeric(format(., '%j'))+4, 
+  mutate(across(starts_with('peak'), ~as.numeric(format(., '%j'))+4,
                 .names = '{col}_doy'))
 
-png('figures/distribution_peak_gpp_er.png', height = 4, width = 5, res = 300, 
+png('figures/distribution_peak_gpp_er.png', height = 4, width = 5, res = 300,
     units = 'in', family = 'cairo')
-  plot(density(sum$peak_gpp_doy, na.rm = T), xlim = c(0, 365), 
+  plot(density(sum$peak_gpp_doy, na.rm = T), xlim = c(0, 365),
        col = 'forestgreen', lwd = 2, xaxt = 'n', xlab = 'Date',
        main = 'Distribution of peak ER and GPP (n = 10)')
   lines(density(sum$peak_er_doy), col = 'sienna', lwd = 2)
-  axis(1, at = as.numeric(format(seq(as.Date('2019-01-01'), length.out = 12, 
+  axis(1, at = as.numeric(format(seq(as.Date('2019-01-01'), length.out = 12,
                                     by = 'month'), '%j')), labels = month.abb)
-  polygon(c(62, 71, 71, 62), c(0,0,0.025,0.025), col = alpha('sienna', .4),
+  polygon(c(62, 71, 71, 62), c(0,0,0.02,0.02), col = alpha('sienna', .4),
           border = NA)
-  polygon(c(68, 77, 77, 68), c(0,0,0.025,0.025), 
+  polygon(c(68, 77, 77, 68), c(0,0,0.02,0.02),
           col = alpha('forestgreen', .5), border = NA)
-  legend('topright', c('GPP 2017-19', 'ER 2017-19', 'GPP 1969', 'ER 1969'), 
+  legend('topright', c('GPP 2017-19', 'ER 2017-19', 'GPP 1969', 'ER 1969'),
          col = c('forestgreen', 'sienna', NA, NA),
-         fill = c(NA, NA, alpha('forestgreen', .5), alpha('sienna', .4)), 
+         fill = c(NA, NA, alpha('forestgreen', .5), alpha('sienna', .4)),
          lwd = 2, lty = c(1,1,NA, NA), border = NA, bty = 'n',
          x.intersp = c(1,1,0, 0), seg.len = 1.2, inset = .02)
 dev.off()
@@ -38,9 +38,9 @@ geo <- read_csv("data/reach_characterization/nhc_habitat_dimensions_by_reach.csv
 geo <- sites %>%
   select(site = sitecode, width_mar_m, habitat, slope, distance_m) %>%
   left_join(geo, by = c('site', 'distance_m')) %>%
-  right_join(dat) 
+  right_join(dat)
 
-geosum <- geo %>% 
+geosum <- geo %>%
   select(site, width_mar_m, avg_depth_mar, slope, distance_m) %>%
   group_by(site) %>%
   summarize_all(mean, na.rm = T)
@@ -67,8 +67,8 @@ png('figures/drivers_annual_met_by_width_depth_slope.png', width = 5, height = 4
   met_dat %>%
     filter(year == 2019,
            variable %in% c('cum', 'median')) %>%
-    pivot_longer(cols = any_of(c('avg_width', 'avg_depth_mar', 'slope')), 
-                 names_to = 'geo_measure', 
+    pivot_longer(cols = any_of(c('avg_width', 'avg_depth_mar', 'slope')),
+                 names_to = 'geo_measure',
                  values_to = 'geo_value') %>%
   ggplot( aes(geo_value, value, color = met)) +
     geom_point() +
@@ -102,7 +102,7 @@ met <- readRDS('data/metabolism/compiled/met_preds_stream_metabolizer.rds')$pred
   select(site, year, GPP, ER, discharge, temp.water, DO.obs) %>%
   group_by(site, year) %>%
   summarize(across(everything(), mean, na.rm = T))
-  
+
 summary(lm(ER ~ temp.water, data = met))
 summary(lm(GPP ~ temp.water, data = met))
 summary(lm(ER+GPP ~ DO.obs, data = met))
@@ -127,8 +127,8 @@ for(s in slist){
   pd = bind_rows(pd, data.frame(gpp = gpp, er = er))
 }
 
-all_pd <- pd %>% 
-  summarize_all(.funs = list(mean = ~mean(.*2), 
+all_pd <- pd %>%
+  summarize_all(.funs = list(mean = ~mean(.*2),
                              sd = ~sd(.*2))) %>%
   mutate(scale = "sites")
 nhc = filter(yy, site == "NHC")
@@ -142,7 +142,7 @@ for(y in 2018:2019){
   er = abs((nhc$er_mean[nhc$year == y] - er_mean)/
               (nhc$er_mean[nhc$year == y] + er_mean))
   pd = bind_rows(pd, data.frame(gpp = gpp, er = er))
-  
+
   gpp_mean = unhc$gpp_mean[unhc$year == 2017]
   gpp = abs((unhc$gpp_mean[unhc$year == y] - gpp_mean)/
               (unhc$gpp_mean[unhc$year == y] + gpp_mean))
@@ -152,27 +152,27 @@ for(y in 2018:2019){
   pd = bind_rows(pd, data.frame(gpp = gpp, er = er))
 }
 
-all_pd <- dd %>% 
+all_pd <- dd %>%
   summarize(gpp_mean = abs(diff(gpp_mean)/sum(gpp_mean))*2,
             er_mean = abs(diff(er_mean)/sum(er_mean))*2) %>%
   mutate(scale = "decades") %>%
   bind_rows(all_pd)
-all_pd <- pd %>% 
-  summarize_all(.funs = list(mean = ~mean(.*2), 
+all_pd <- pd %>%
+  summarize_all(.funs = list(mean = ~mean(.*2),
                              sd = ~sd(.*2))) %>%
   mutate(scale = "years") %>%
   bind_rows(all_pd)
 
-png('figures/percent_difference_in_cumulative_met_across_scales.png', 
+png('figures/percent_difference_in_cumulative_met_across_scales.png',
     width = 5, height = 4, units = 'in', res = 300)
-all_pd %>% 
+all_pd %>%
   pivot_longer(cols = -scale, names_to = c('met', 'meas'),
                names_pattern = '([a-z]+)_([a-z]+)',
                values_to = 'percent_difference') %>%
   pivot_wider(names_from = meas, values_from = percent_difference) %>%
 ggplot(aes(scale, mean, fill = met)) +
   geom_bar(stat = 'identity', position = 'dodge') +
-  geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd), 
+  geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),
              stat = 'identity', position = position_dodge(.9), width = .2) +
   ylab("percent difference between site years")
 dev.off()

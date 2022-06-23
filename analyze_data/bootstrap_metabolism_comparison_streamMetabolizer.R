@@ -4,11 +4,11 @@ library(beanplot)
 library(scales)
 
 #setup ####
-#historic data 
-dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer.rds")
+#historic data
+dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_C.rds")
 # dat <- readRDS("NHC_2019_metabolism/data/metabolism/compiled/met_preds_direct_calc.rds")
 nhc_68_70 = dat$preds %>%
-    filter(era == "then", 
+    filter(era == "then",
            site == "CBP") %>%
     select(-era)
 
@@ -45,37 +45,37 @@ dates_new = nhc_new$date
 #     filename='figures/metab_distributions_v2.png')
 
 # defpar = par(mfrow=c(2,3))
-# 
+#
 # #plot GPP dists, then and now
 # plot(density(gpp_68_70, na.rm=TRUE), bty='l', col='sienna3',
 #      main='GPP 1968-70 vs. 2019', xlab='GPP')
 # lines(density(gpp_new, na.rm=TRUE), col='blue')
-# legend('topright', 
-#        legend=c('68-70; n=76', 
+# legend('topright',
+#        legend=c('68-70; n=76',
 #                 paste0('19; n=', length(which(!is.na(gpp_new))))),
 #        col = c('sienna3','blue'), lty = 1, bty = 'n',
 #        seg.len = 1, cex = 0.9, lwd = 2)
-# 
+#
 # #plot ER dists, then and now
 # plot(density(er_68_70, na.rm=TRUE), bty='l', col='sienna3',
 #      main='ER 1968-70 vs. 2019', xlab='ER')
 # lines(density(er_new, na.rm=TRUE), col='blue')
-# legend('topleft', 
-#        legend=c('68-70; n=76', 
+# legend('topleft',
+#        legend=c('68-70; n=76',
 #                 paste0('19; n=', length(which(!is.na(er_new))))),
-#        col = c('sienna3','blue'), 
+#        col = c('sienna3','blue'),
 #        lty = 1, bty = 'n', seg.len = 1, cex = 0.9, lwd = 2)
-# 
+#
 # #plot NEP dists, then and now
 # plot(density(nep_68_70, na.rm=TRUE), bty='l', col='sienna3',
 #     main='NEP 1968-70 vs. 2019', xlab='NEP', ylim = c(0,4.5))
 # lines(density(nep_new, na.rm=TRUE), col='blue')
-# legend('topleft', 
-#        legend=c('68-70; n=76', 
+# legend('topleft',
+#        legend=c('68-70; n=76',
 #                 paste0('19; n=', length(which(!is.na(nep_new))))),
-#        col = c('sienna3','blue'), 
+#        col = c('sienna3','blue'),
 #        lty = 1, bty = 'n', seg.len = 1, cex = 0.9, lwd = 2)
-# 
+#
 # #plot GPP dists by year
 # # cols = viridis(6)
 # cols = c(rep('sienna3', 2), 'blue')
@@ -87,9 +87,9 @@ dates_new = nhc_new$date
 #     legend=c(paste0('68; n=', length(gpp_68)),
 #              paste0('69; n=', length(gpp_69)),
 #              paste0('19; n=', length(which(!is.na(gpp_new))))),
-#     col = cols, lty = 1, bty = 'n', 
+#     col = cols, lty = 1, bty = 'n',
 #     seg.len = 1, cex = 0.9, lwd = 2)
-# 
+#
 # #plot ER dists by year
 # plot(density(er_68, na.rm=TRUE), bty='l', col=cols[1],
 #     main='ER by year', xlab='ER', xlim = c(-1.2, .2))
@@ -98,10 +98,10 @@ dates_new = nhc_new$date
 # legend('topleft',
 #     legend=c(paste0('68; n=', length(gpp_68)),
 #              paste0('69; n=', length(gpp_69)),
-#              paste0('19; n=', length(which(!is.na(er_new))))), 
-#     col = cols, lty = 1, bty = 'n', 
+#              paste0('19; n=', length(which(!is.na(er_new))))),
+#     col = cols, lty = 1, bty = 'n',
 #     seg.len = 1, cex = 0.9, lwd = 2)
-# 
+#
 # #plot NEP dists by year
 # plot(density(nep_68, na.rm=TRUE), bty='l', col=cols[1],
 #     main='NEP by year', xlab='NEP', ylim = c(0, 4.5), xlim = c(-.8, .2))
@@ -112,7 +112,7 @@ dates_new = nhc_new$date
 #                paste0('69; n=', length(gpp_69)),
 #                paste0('19; n=', length(which(!is.na(nep_new))))),
 #     col=cols, lty=1, bty='n', seg.len=1, cex=0.9, lwd=2)
-# 
+#
 # dev.off()
 
 #plot temporal coverage for historic data ####
@@ -133,31 +133,31 @@ tiff(filename = 'figures/seasonalcoverage.tif', compression = 'lzw',
      width = 6 * 800, height = 2.05 * 800, res = 800, units = 'px')
 # png(width = 6, height=2.05, units='in', type='cairo', res=300,
 #     filename='figures/seasonalcoverage.png')
-lims = c(min(ny_num), max(ny_num))
+    lims = c(min(ny_num), max(ny_num))
 
-par(mfrow=c(2,1), mar=c(0,0,0,0), oma=c(3,4,2,3))
+    par(mfrow=c(2,1), mar=c(0,0,0,0), oma=c(3,4,2,3))
 
-beanplot(ny_num, horizontal = TRUE, col = now_col, xaxt = 'n', 
-         frame.plot = FALSE, ylim = lims)
-mtext('2019', 2, line = 1)
-mtext(paste('n =', length(! is.na(ny_num))), 2, cex = .7)
-mtext('Annual Sampling Coverage', 3, line = .1, cex = .8)
+    beanplot(ny_num, horizontal = TRUE, col = now_col, xaxt = 'n',
+             frame.plot = FALSE, ylim = lims)
+    mtext('2019', 2, line = 1, adj = .7)
+    mtext(paste('n =', length(! is.na(ny_num))), 2, cex = .7)
+    mtext('Annual Sampling Coverage', 3, line = .1, cex = .8)
 
-beanplot(hy_num, horizontal = TRUE, col=then_col, xaxt = 'n',
-         frame.plot = FALSE, ylim = lims)
-mtext(paste('n =', length(! is.na(hy_num))), 2, cex = .7)
-mtext('1968-70', 2, line = 1)
-axis(1, at=seq(as.Date('2020-01-01'), as.Date('2021-01-01'), 
-               length.out=13)[1:13], labels = FALSE)
-axis(1, at=seq(as.Date('2020-01-01'), as.Date('2021-01-01'), length.out=13)[1:12],
-     labels=month.abb, cex.axis = .8)
+    beanplot(hy_num, horizontal = TRUE, col=then_col, xaxt = 'n',
+             frame.plot = FALSE, ylim = lims)
+    mtext(paste('n =', length(! is.na(hy_num))), 2, cex = .7)
+    mtext('1968-70', 2, line = 1, adj = 1)
+    axis(1, at=seq(as.Date('2020-01-01'), as.Date('2021-01-01'),
+                   length.out=13)[1:13], labels = FALSE)
+    axis(1, at=seq(as.Date('2020-01-01'), as.Date('2021-01-01'), length.out=13)[1:12],
+         labels=month.abb, cex.axis = .8)
 
 dev.off()
 
 
 # bootstrap some confidence bounds ####
 # bootstrapped proportional to year, excluding september
-    
+
 n_68 = length(gpp_68_70[!is.na(gpp_68_70)])
 n_new = length(er_new[!is.na(er_new)])
 month_props <- c(31, 28, 31, 30, 31, 30, 31, 31, 0, 31, 30, 31)
@@ -182,31 +182,31 @@ CI_prop <- data.frame()
 for(ss in 1:5){
     set <- turboset[[ss]]
     for(i in 1:nsamp){
-        samp_68_70_er = samp_new_er = 
+        samp_68_70_er = samp_new_er =
             samp_68_70_gpp = samp_new_gpp = c()
-        
+
         for(m in names(month_props[set])){
             nn <- month_props[m]/sum(month_props[set])
             t_er_68_70 <- er_68_70_bymo[[m]]
             t_gpp_68_70 <- gpp_68_70_bymo[[m]]
             t_er_new <- er_new_bymo[[m]]
             t_gpp_new <- gpp_new_bymo[[m]]
-            
+
             samp_68_70_er = c(samp_68_70_er,
-                              sample(t_er_68_70, 
-                                     size = round(nn * n_68, 0), 
+                              sample(t_er_68_70,
+                                     size = round(nn * n_68, 0),
                                      replace=TRUE))
             samp_new_er = c(samp_new_er,
-                            sample(t_er_new, 
-                                   size = round(nn * n_new, 0), 
+                            sample(t_er_new,
+                                   size = round(nn * n_new, 0),
                                    replace=TRUE))
-            samp_68_70_gpp = c(samp_68_70_gpp, 
-                               sample(t_gpp_68_70, 
-                                      size = round(nn * n_68, 0), 
+            samp_68_70_gpp = c(samp_68_70_gpp,
+                               sample(t_gpp_68_70,
+                                      size = round(nn * n_68, 0),
                                       replace=TRUE))
             samp_new_gpp = c(samp_new_gpp,
-                                 sample(t_gpp_new, 
-                                        size = round(nn * n_new, 0),     
+                                 sample(t_gpp_new,
+                                        size = round(nn * n_new, 0),
                                         replace=TRUE))
             }
         mean_vect_er_68_70[i] = mean(samp_68_70_er)
@@ -219,82 +219,106 @@ for(ss in 1:5){
     CI_p = data.frame('CI95_lower'=numeric(4), 'median'=numeric(4),
         'CI95_upper'=numeric(4), 'met' = c(rep("GPP", 2), rep("ER", 2)),
         'era' = rep(c('then', 'now'), 2), 'prop' = names[ss])
-    CI_p[1,1:3] = quantile(sort(mean_vect_gpp_68_70), 
+    CI_p[1,1:3] = quantile(sort(mean_vect_gpp_68_70),
                            probs=c(0.025, 0.5, 0.975))
-    CI_p[2,1:3] = quantile(sort(mean_vect_gpp_new), 
+    CI_p[2,1:3] = quantile(sort(mean_vect_gpp_new),
                            probs=c(0.025, 0.5, 0.975))
-    CI_p[3,1:3] = -quantile(sort(mean_vect_er_68_70), 
+    CI_p[3,1:3] = -quantile(sort(mean_vect_er_68_70),
                             probs=c(0.025, 0.5, 0.975))
-    CI_p[4,1:3] = -quantile(sort(mean_vect_er_new), 
+    CI_p[4,1:3] = -quantile(sort(mean_vect_er_new),
                             probs=c(0.025, 0.5, 0.975))
-    
+
     CI_prop <- bind_rows(CI_prop, CI_p)
     if(ss == 1){
         CI = data.frame(met = rep(c(rep("GPP", 3), rep("ER", 3)),2),
                         era = c(rep("now", 6), rep("then", 6)),
-                        val = c(quantile(mean_vect_gpp_new, 
+                        val = c(quantile(mean_vect_gpp_new,
                                          probs = c(.025, .5, .975)),
-                                -quantile(mean_vect_er_new, 
+                                -quantile(mean_vect_er_new,
                                           probs = c(.025, .5, .975)),
-                                quantile(mean_vect_gpp_68_70, 
+                                quantile(mean_vect_gpp_68_70,
                                          probs = c(.025, .5, .975)),
-                                -quantile(mean_vect_er_68_70, 
+                                -quantile(mean_vect_er_68_70,
                                           probs = c(.025, .5, .975))))
-        }                    
+        }
 }
 
 write.csv(CI_prop, 'data/metabolism/compiled/bootstrapped/SM_met_means_bootstrapped_by_month_proportions.csv')
 
-CI <- CI %>% 
+CI <- CI %>%
     mutate(era = factor(era, levels = c("then", "now")),
            met = factor(met, levels = c("GPP", "ER")),
            b = "Bootstrapped 95% CI's")
 
 tiff(filename = 'figures/bootstrapped_CI_daily_mean_SM.tif', compression = 'lzw',
      height = 5 * 800, width = 2.2 * 800, res = 800, units = 'px' )
-# png('figures/bootstrapped_CI_daily_mean_streamMetabolizer_2.png', 
+# png('figures/bootstrapped_CI_daily_mean_streamMetabolizer_2.png',
 #     height = 5, width = 2.2, type = 'cairo',  res = 300, units = 'in')
-    
+
     ggplot(CI, aes(met, val, fill = era)) +
         geom_boxplot(coef = 3)+
-        # stat_boxplot(geom ='errorbar', width = .1, 
+        # stat_boxplot(geom ='errorbar', width = .1,
         #              position = position_dodge(.75)) +
         facet_wrap(.~b)+
         scale_fill_manual(values = c(then_col, now_col)) +
         theme_bw() +
         xlab("") +
         ylim(.2, .8)+
-        ylab("Mean Daily Metabolism (gC/m2/d)")+
+        ylab(expression(paste("Mean Daily Metabolism (g C/ ", m^2, "/d)")))+
         theme(legend.position = "none",
-              panel.grid.major = element_blank(), 
+              panel.grid.major = element_blank(),
               panel.grid.minor = element_blank())
 dev.off()
 
 # numbers for results section
+cbp_mon <- dat$preds %>%
+    filter(site == "CBP") %>%
+    select(month, era, GPP, ER) %>%
+    mutate(ER = -ER) %>%
+    pivot_longer(cols = c("GPP", "ER"), names_to = "met", values_to = 'gCm2d') %>%
+    group_by(month, era, met) %>%
+    summarize(across(all_of("gCm2d"),
+                     .fns = list(mean = ~mean(., na.rm = T),
+                                 sd = ~sd(., na.rm = T)),
+                     # lower95 = ~quantile(., 0.025, na.rm = T)),
+                     .names = '{col}_{fn}'),
+              n = n())
+
 mm = c(1,11,12)
 mm = c(4,5)
 mm = c(6,7)
 mm = 3
+
 cbp_mon %>% filter(month %in% mm) %>%
     group_by(era, met) %>%
     summarize(mean = mean(gCm2d_mean, na.rm = T),
               cv = sd(gCm2d_mean, na.rm = T)/mean)
 
-# png('figures/bootstrapped_CI_daily_mean_streamMetabolizer.png', 
+dat$preds %>%
+    filter(site == 'CBP',
+           month %in% mm) %>%
+    pivot_longer(cols = any_of(c('GPP', 'ER')),
+                 names_to = 'met',
+                 values_to = 'gCm2d_mean') %>%
+    group_by(era, met) %>%
+    summarize(mean = mean(gCm2d_mean, na.rm = T),
+              cv = sd(gCm2d_mean, na.rm = T)/mean)
+
+# png('figures/bootstrapped_CI_daily_mean_streamMetabolizer.png',
 #     height = 6, width = 3, type = cairo,  res = 300, units = 'in')
 #     par(mfrow = c(1,2), mar = c(3,2,4,1), oma = c(0,3,1,0))
 #     tmp <- CI_prop %>%
-#         filter(prop == "by hall sampling") 
-#     boxplot(t(tmp[,1:3]), col = c(alpha(then_col,.8),now_col ), 
+#         filter(prop == "by hall sampling")
+#     boxplot(t(tmp[,1:3]), col = c(alpha(then_col,.8),now_col ),
 #             ylim = c(0.2, .9),
 #             xaxt = "n", xlab = "")
 #     axis(1, at=c(1.5, 3.5), labels=c("GPP", "ER"), line=0)
 #     mtext("Proportional to Hall 1972 sampling")
 #     mtext("CI around mean (g C/m2/d)", side = 2, line = 3)
-#     
+#
 #     tmp <- CI_prop %>%
-#         filter(prop == "year") 
-#     boxplot(t(tmp[,1:3]), col = c(alpha(then_col,.8),now_col ), 
+#         filter(prop == "year")
+#     boxplot(t(tmp[,1:3]), col = c(alpha(then_col,.8),now_col ),
 #             ylim = c(0.2, 0.9),
 #             xaxt = "n", xlab = "")
 #     axis(1, at=c(1.5, 3.5), labels=c("GPP", "ER"), line=0)
@@ -303,16 +327,16 @@ cbp_mon %>% filter(month %in% mm) %>%
 #            c("then", "now"),
 #            fill = c(alpha(then_col,.75),now_col ))
 #     par(new = T, mfrow = c(1,1))
-#     mtext('Bootstrapped daily metabolism estimates at Concrete Bridge', 
+#     mtext('Bootstrapped daily metabolism estimates at Concrete Bridge',
 #           line = 2, cex = 1.1)
 # dev.off()
 
-# png('figures/bootstrapped_CI_daily_mean_streamMetabolizer_byseason.png', 
+# png('figures/bootstrapped_CI_daily_mean_streamMetabolizer_byseason.png',
 #     height = 4, width = 8, res = 300, units = 'in')
 #     par(mfrow = c(1,4), mar = c(3,2,4,1), oma = c(0,3,1,0))
 #     tmp <- CI_prop %>%
-#         filter(prop == "jan_feb") 
-#     boxplot(t(tmp[,1:3]), col = c(alpha(then_col,.8),now_col ), 
+#         filter(prop == "jan_feb")
+#     boxplot(t(tmp[,1:3]), col = c(alpha(then_col,.8),now_col ),
 #             ylim = c(0, 1),
 #             xaxt = "n", xlab = "")
 #     axis(1, at=c(1.5, 3.5), labels=c("GPP", "ER"), line=0)
@@ -321,36 +345,36 @@ cbp_mon %>% filter(month %in% mm) %>%
 #     # legend("bottom",cex=1, bty = "n",
 #     #        c("then", "now"),
 #     #        fill = c(alpha(then_col,.75),now_col ))
-#     
+#
 #     tmp <- CI_prop %>%
-#         filter(prop == "mar_apr") 
-#     boxplot(t(tmp[,1:3]), col = c(alpha(then_col,.8),now_col ), 
+#         filter(prop == "mar_apr")
+#     boxplot(t(tmp[,1:3]), col = c(alpha(then_col,.8),now_col ),
 #             ylim = c(0, 1),
 #             xaxt = "n", xlab = "")
 #     axis(1, at=c(1.5, 3.5), labels=c("GPP", "ER"), line=0)
 #     mtext("Mar - Apr")
-#     
+#
 #     tmp <- CI_prop %>%
-#         filter(prop == "jul_aug") 
-#     boxplot(t(tmp[,1:3]), col = c(alpha(then_col,.8),now_col ), 
+#         filter(prop == "jul_aug")
+#     boxplot(t(tmp[,1:3]), col = c(alpha(then_col,.8),now_col ),
 #             ylim = c(0, 1),
 #             xaxt = "n", xlab = "")
 #     axis(1, at=c(1.5, 3.5), labels=c("GPP", "ER"), line=0)
 #     mtext("Jul - Aug")
-#     
+#
 #     tmp <- CI_prop %>%
-#         filter(prop == "oct_nov") 
-#     boxplot(t(tmp[,1:3]), col = c(alpha(then_col,.8),now_col ), 
+#         filter(prop == "oct_nov")
+#     boxplot(t(tmp[,1:3]), col = c(alpha(then_col,.8),now_col ),
 #             ylim = c(0, 1),
 #             xaxt = "n", xlab = "")
 #     axis(1, at=c(1.5, 3.5), labels=c("GPP", "ER"), line=0)
 #     mtext("Oct - Nov")
-# 
+#
 #     par(new = T, mfrow = c(1,1))
-#     mtext('Bootstrapped daily metabolism estimates at Concrete Bridge', 
+#     mtext('Bootstrapped daily metabolism estimates at Concrete Bridge',
 #           line = 3.4, cex = 1.1)
-#  
+#
 # dev.off()
-         
+
 # CI by months
 

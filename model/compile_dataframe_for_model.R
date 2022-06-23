@@ -3,13 +3,13 @@
 # A Carter
 library(tidyverse)
 library(lubridate)
-setwd('C:/Users/Alice Carter/git/nhc_50yl')
+setwd('C:/Users/alice.carter/git/nhc_50yl')
 
-# Load metabolism predictions: 
-dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer.rds")
+# Load metabolism predictions:
+dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_O2.rds")
 sites <- read_csv('data/siteData/NHCsite_metadata.csv') %>%
   slice(c(1:5, 7))
-met <- dat$preds 
+met <- dat$preds
 
 # load additional driver variables:
 dd <- tibble()
@@ -24,7 +24,7 @@ ll <- read_csv('data/light/drivers/daily_modeled_light_all_sites.csv')
 
 # summarize data to daily and combine:
 d <- dd %>%
-  mutate(DateTime_EST = with_tz(DateTime_UTC, 'EST'), 
+  mutate(DateTime_EST = with_tz(DateTime_UTC, 'EST'),
          date = as.Date(DateTime_EST, tz = 'EST')) %>%
   group_by(site, date) %>%
   summarize(across(any_of(c('depth', 'avg_velocity', 'light')), mean, na.rm = T)) %>%
@@ -38,6 +38,6 @@ met <- met %>%
   mutate(depth = case_when(is.na(depth) ~ depth_hall,
                            TRUE ~ depth)) %>%
   select(-depth_hall, -method, -era)
-                 
+
 write_csv(met, 'data/metabolism/metabolism_and_drivers.csv')
 

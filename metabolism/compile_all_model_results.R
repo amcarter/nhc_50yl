@@ -23,7 +23,7 @@ sm_preds <- sm_fit$preds %>%
          month = as.numeric(format(date, "%m")),
          across(starts_with(c('GPP', 'ER')), ~ . * O2toC),
          era = "now") %>%
-  filter(date <= as.Date("2020-03-21"))
+  filter(date <= as.Date("2020-03-25"))
 sm_preds_filled <- sm_fit$cumulative %>%
   as_tibble() %>%
   rename(discharge = discharge.daily) %>%

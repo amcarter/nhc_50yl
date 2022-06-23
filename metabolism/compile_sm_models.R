@@ -42,9 +42,9 @@ for(file in filelist) {
     obserr <- bind_rows(obserr, obs)
 
     if(site == "wbp"){
-        fit@data <- fit@data %>% filter(date <= as.Date("2020-03-20"))
-        fit@fit$daily <- fit@fit$daily %>% filter(date <= as.Date("2020-03-20"))
-        fit@data_daily <- fit@data_daily %>% filter(date <= as.Date("2020-03-20"))
+        fit@data <- fit@data %>% filter(date <= as.Date("2020-03-25"))
+        fit@fit$daily <- fit@fit$daily %>% filter(date <= as.Date("2020-03-25"))
+        fit@data_daily <- fit@data_daily %>% filter(date <= as.Date("2020-03-25"))
     }
     out <- filter_model(fit, flow_dates)
     preds <- out[[1]]
