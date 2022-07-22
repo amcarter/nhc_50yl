@@ -3,3 +3,6 @@ data/*
 !data/gee
 .Rhistory
 /figs
+*.tiff
+map_files_archived/map_files
+*.zip
