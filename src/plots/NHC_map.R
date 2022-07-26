@@ -90,7 +90,7 @@ map_without_colon = tm_shape(watershed_boundary, bbox = qq) +
     tm_add_legend(type='fill', labels = 'Duke Forest', col = 'springgreen3', alpha=0.3,
                   border.col='transparent') +
     tm_legend(show=TRUE, position=c('left', 'top'), outside=FALSE, bg.color='gray97',
-              frame=TRUE, text.size=.9)
+              frame=TRUE, text.size=.7)
 # map_without_colon
 tmap_save(map_without_colon, filename="figs/map_without_colon.tiff",
           bg="white", dpi = 800, height = 2.5, width = 3.5, units = 'in')
