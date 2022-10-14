@@ -87,7 +87,7 @@ dat <- dat %>%
   select(-pressure_Pa) %>%
   left_join(ysi[ysi$site == dat$site[1],])
 
-# plot_pres(dat)
+plot_pres(dat)
 
   if(dat$site[1] == "NHC"){
     gaps <- rle_custom(is.na(dat$level_m))
