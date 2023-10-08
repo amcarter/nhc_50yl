@@ -27,18 +27,12 @@ for(file in filelist) {
                      pattern = '^[a-z]+_([a-z]+)_?([0-9]+)?_([a-z]+_[a-z]+)')
     site <- tmp[2]
     method <- tmp[4]
-    year = 2019
 
-    if(site %in% c("nhc", "unhc"))  {
-        year = as.numeric(tmp[3])
-    } else {
-        year = 2019
-    }
     # Incorporate something here to look at obs and proc error
     obs <- get_fit(fit)$overall %>%
         select(err_obs_iid_sigma_50pct, err_obs_iid_sigma_Rhat,
                err_proc_iid_sigma_50pct, err_proc_iid_sigma_Rhat) %>%
-        mutate(site = site, year = year)
+        mutate(site = site)
     obserr <- bind_rows(obserr, obs)
 
     if(site == "wbp"){
@@ -49,18 +43,15 @@ for(file in filelist) {
     out <- filter_model(fit, flow_dates)
     preds <- out[[1]]
     coverage <- data.frame(site = site,
-                           year = year,
                            method = method)
     coverage <- bind_cols(coverage, out[[2]])
 
     out <- fill_summarize_met(preds)
     cum <- out[[1]] %>%
         mutate(site = site,
-               year = year,
                method = method)
     preds <- preds %>%
         mutate(site = site,
-               year = year,
                method = method)
 
     # bad <- unique(preds$date[is.na(preds$GPP) & is.na(preds$ER)])
@@ -80,7 +71,7 @@ for(file in filelist) {
     #                                 "K600_daily[20]"), nrow = 5)
     # plot_diagnostics(fit, preds, paste(site, year, method),
     #                  ylim = c(-15, 7), lim = 7)
-    tiff(paste0('figures/SI/model_fit_', site, year, '.tiff'),
+    tiff(paste0('figures/SI/model_fit_', site, '.tiff'),
         width = 6*800, height = 3*800, res = 800, units = 'px',
         compression = 'lzw')
         par(ps = 10,

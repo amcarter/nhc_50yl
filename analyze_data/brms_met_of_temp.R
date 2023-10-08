@@ -4,25 +4,46 @@
 # 2/2022
 library(tidyverse)
 library(lme4)
+library(brms)
 
-setwd('C:/Users/Alice Carter/git/nhc_50yl/')
+setwd('C:/Users/alice.carter/git/nhc_50yl/')
 
 dat <- read_csv("data/metabolism/metabolism_and_drivers.csv")
 sites <- read_csv('data/siteData/NHCsite_metadata.csv') %>%
   slice(c(1:5, 7))
 
 # Test basic GPP model
-P <- dat %>% 
-  select(date, site, GPP, GPP.lower, GPP.upper, discharge, 
-         temp.water, light, slope) %>%
+P <- dat %>%
+  select(date, site,ER,  GPP, GPP.lower, GPP.upper, discharge,
+         temp.water, light = PAR_surface)%>%#, slope) %>%
   group_by(site) %>%
-  mutate(GPP_pre = c(NA, GPP[1:(n()-1)]))
+  left_join(select(sites, site = sitecode, slope = slope_nhd)) %>%
+  mutate(GPP_pre = c(NA, GPP[1:(n()-1)])) %>%
+  mutate(across(any_of))
+
 
 P <- filter(P, site == 'CBP') %>%
   mutate(discharge = log(discharge),
          across(.cols = any_of(c('light', 'discharge')), .fns = scale))
 mod <- lm(GPP ~ GPP_pre + light + discharge, data = P)
 summary(mod)
+
+dat
+
+m2 <- brm(ER ~ ar(p = 1, gr = site) + (1|site) +
+            discharge + temp.water + discharge*temp.water + slope,
+            data = P)
+
+m3 <- brm(ER ~ ar(p = 1, gr = site) +
+            light + discharge*temp.water + slope,
+            data = P)
+
+
+G1 <- brm(GPP ~ ar(p = 1, gr = site) +
+            light + discharge*temp.water + slope,
+            data = P)
+
+summary(m2)
 
 phi = 0.83
 b_light = 0.0364
