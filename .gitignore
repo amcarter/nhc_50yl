@@ -3,3 +3,5 @@ data/*
 !data/gee
 .Rhistory
 /figs
+*.doc
+model/model_runs
