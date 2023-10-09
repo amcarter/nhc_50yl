@@ -3,7 +3,7 @@ library(tidyverse)
 library(dataRetrieval)
 library(lubridate)
 
-setwd('C:/Users/Alice Carter/git/nhc_50yl/')
+setwd('C:/Users/alice.carter/git/nhc_50yl/src')
 sites <- read_csv('data/siteData/NHCsite_metadata.csv')
 
 
@@ -20,9 +20,9 @@ q <- read_csv('data/rating_curves/NHC_UNHC_Q.csv', guess_max = 10000) %>%
 q <- q %>%
   pivot_longer(cols =  starts_with(c('discharge', 'stage')),
                names_pattern = '^(discharge|stage)_(.*)$',
-               names_to = c('.value','site')) %>% 
+               names_to = c('.value','site')) %>%
   mutate(site = toupper(site))
-                                  
+
 
 # get discharge data for NHC site at blands from NWIS
 site_no <- substr(sites$sitecode[12], 6, 13)
@@ -31,14 +31,14 @@ site_no <- substr(sites$sitecode[12], 6, 13)
 dat <- readNWISuv(siteNumbers = site_no, parameterCd = c('00060', '00065'),
                   startDate = '2017-03-01', endDate = '2020-04-01')
 
-dat <- dat %>% 
+dat <- dat %>%
   as_tibble() %>%
   rename(DateTime_UTC = dateTime) %>%
   select(-ends_with('cd')) %>%
   pivot_longer(starts_with('X')) %>%
   mutate(site = paste('USGS', site_no, sep = '-'),
          parm_cd = substr(name, 3, 7),
-         variable = case_when(parm_cd == '00060' ~ 'discharge_cfs', 
+         variable = case_when(parm_cd == '00060' ~ 'discharge_cfs',
                               parm_cd == '00065' ~ 'stage_f')) %>%
   select(-name, -parm_cd) %>%
   pivot_wider(names_from = 'variable', values_from = 'value') %>%
@@ -46,7 +46,7 @@ dat <- dat %>%
          stage = stage_f / 3.28) %>%
   select(DateTime_UTC, site, discharge, stage)
 
-dat <- dat%>% 
+dat <- dat%>%
   mutate(discharge = zoo::na.approx(discharge, na.rm = F),
          stage = zoo::na.approx(stage, na.rm = F))
 qq <- bind_rows(q, dat) %>%
@@ -72,7 +72,7 @@ meds <- qq %>%
   select(sitecode, medq, med_logq, ws_area.km2)
 
 # examine how median discharge varies with watershed area:
-AQcurve <- data.frame(x = seq(-5,5, by = .1)) 
+AQcurve <- data.frame(x = seq(-5,5, by = .1))
 AQcurve$y = exp(AQcurve$x)*197/1.03
 library(ggridges)
 png('figures/Q_by_ws_area_NHC.png')
@@ -82,26 +82,26 @@ qq %>%
   ggplot(aes(x = log(discharge), y = ws_area.km2,
              col = sitecode)) +
     geom_density_ridges(aes(fill = sitecode), alpha = .3) +
-    theme_ridges() + 
-    # geom_density(alpha = .3) + 
+    theme_ridges() +
+    # geom_density(alpha = .3) +
     geom_point(data = meds, aes(x = med_logq, y = ws_area.km2 ))+
     geom_line(data = AQcurve, aes(x, y), col = 'black')+
     xlim(-5,5)+ ylim(0, 300)+
     ylab('watershed area') + xlab('log(discharge)')
 dev.off()
 
-yy <- qq %>% 
+yy <- qq %>%
   mutate(year = year(DateTime_UTC),
          discharge = case_when(site == 'NHC' & discharge > 6 ~ NA_real_,
                                site == 'UNHC' & discharge > 2.6 ~ NA_real_,
                                TRUE ~ discharge)) %>%
-  group_by(site, year) %>% 
-  mutate(discharge = zoo::na.approx(discharge, na.rm = F)) %>% 
+  group_by(site, year) %>%
+  mutate(discharge = zoo::na.approx(discharge, na.rm = F)) %>%
   summarize(discharge = sum(discharge, na.rm = T)) %>%
   rename(sitecode = site) %>% left_join(meds[,c(1,4)])
 
 ggplot(yy, aes(x = year, y = discharge, fill = sitecode)) +
   geom_bar(stat = 'identity', position = 'dodge')
 
-ggplot(yy, aes(x = ws_area.km2, y = discharge, col = factor(year))) + 
+ggplot(yy, aes(x = ws_area.km2, y = discharge, col = factor(year))) +
   geom_line()

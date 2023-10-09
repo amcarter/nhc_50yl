@@ -31,12 +31,12 @@ summary(hall)
 summary(now)
 
 
-nuts <- read_csv("C:/Users/Alice Carter/git/ghg_patterns_nhc/data/water_chemistry/water_chemistry_2019-2020_compiled.csv") %>%
+nuts <- read_csv("C:/Users/alice.carter/git/ghg_patterns_nhc/data/water_chemistry/water_chemistry_2019-2020_compiled.csv") %>%
   select(-sample_name, -time) %>%
   mutate(site = toupper(site)) %>%
   filter(site != "MC751")
 
-SP_wchem <- read_csv('C:/Users/Alice Carter/git/ghg_patterns_nhc/data/water_chemistry/StreampulseWQDec2020.csv') %>%
+SP_wchem <- read_csv('C:/Users/alice.carter/git/ghg_patterns_nhc/data/water_chemistry/StreampulseWQDec2020.csv') %>%
   filter(site %in% c('NHC', 'UNHC')) %>%
   select(site, date, cl_mgl = Cl, so4_mgl = 'SO4 (mg/L)', br_mgl = Br, 
          no3n_mgl = 'NO3-N', na_mgl = 'Na (mg/L)', k_mgl = 'K (mg/L)', 
@@ -59,7 +59,7 @@ SP_wchem <- read_csv('C:/Users/Alice Carter/git/ghg_patterns_nhc/data/water_chem
 
 
 
-spchem <- read_csv("C:/Users/Alice Carter/git/ghg_patterns_nhc/data/water_chemistry/all_grab_data.csv") %>%
+spchem <- read_csv("C:/Users/alice.carter/git/ghg_patterns_nhc/data/water_chemistry/all_grab_data.csv") %>%
   filter(siteID %in% c("NHC", "UNHC")) %>%
   dplyr::select(-flagID, -flagComment, -methodDetail, -writeInMethod, -regionID, -method) %>% 
   group_by(siteID, dateTimeUTC, variable) %>%
@@ -141,7 +141,7 @@ summary(lm(GPP~DO_mgl, data = filled))
 summary(lm(no3n_mgl~DO_mgl, data = filled))
 summary(lm(doc_mgl~DO_mgl, data = filled))
 
-met <- readRDS("C:/Users/Alice Carter/git/nhc_50yl/NHC_2019_metabolism/data/metabolism/compiled/met_preds_stream_metabolizer.rds")$preds %>%
+met <- readRDS("C:/Users/alice.carter/git/nhc_50yl/NHC_2019_metabolism/data/metabolism/compiled/met_preds_stream_metabolizer.rds")$preds %>%
   filter(era == 'now', site !='PWC', year != 2020) %>%
   select(year, date, site, GPP, ER, discharge, DO_mgl = DO.obs, DO.sat) %>%
   mutate(DO_mgl = DO_mgl/DO.sat)

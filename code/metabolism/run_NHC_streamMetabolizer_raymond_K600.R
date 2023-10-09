@@ -11,7 +11,7 @@ library(streamMetabolizer)
 library(lubridate)
 library(dygraphs)
 
-setwd("C:/Users/alice.carter/git/nhc_50yl/data")
+setwd("C:/Users/alice.carter/git/nhc_50yl/src/data")
 # setwd("~Desktop/donkey")
 ## Read in Data ####
 sites <- read_csv("data/NHCsite_metadata.csv")

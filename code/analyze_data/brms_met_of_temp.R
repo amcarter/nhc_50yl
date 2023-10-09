@@ -6,7 +6,7 @@ library(tidyverse)
 library(lme4)
 library(brms)
 
-setwd('C:/Users/alice.carter/git/nhc_50yl/')
+setwd('C:/Users/alice.carter/git/nhc_50yl/src')
 
 dat <- read_csv("data/metabolism/metabolism_and_drivers.csv")
 sites <- read_csv('data/siteData/NHCsite_metadata.csv') %>%

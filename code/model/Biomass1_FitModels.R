@@ -2,7 +2,7 @@
 ## Modified: June 23, 2021
 ## Heili Lowman
 
-setwd('C:/Users/Alice Carter/git/nhc_50yl')
+setwd('C:/Users/alice.carter/git/nhc_50yl/src')
 # load packages
 lapply(c("plyr","dplyr","ggplot2","cowplot","lubridate",
          "parallel","tidyverse","rstan","devtools",
@@ -23,10 +23,10 @@ options(mc.cores=6)
 
 ## compile data
 stan_data_compile <- function(x){
-  data <- list(Ndays=length(x$GPP), 
-               light = x$light/max(x$light, na.rm = T), 
+  data <- list(Ndays=length(x$GPP),
+               light = x$light/max(x$light, na.rm = T),
                GPP = x$GPP,
-               GPP_sd = (x$GPP.upper - x$GPP.lower)/3.92, 
+               GPP_sd = (x$GPP.upper - x$GPP.lower)/3.92,
                tQ = x$Q/max(x$Q, na.rm = T))
   return(data)
 }

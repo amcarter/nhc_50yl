@@ -21,7 +21,7 @@ library(LakeMetabolizer)
 library(StreamPULSE)
 
 # uncomment this section if not sourcing file from master script
-# setwd('C:/Users/alice.carter/git/nhc_50yl/')
+# setwd('C:/Users/alice.carter/git/nhc_50yl/src')
 # sites <- read_csv("data/siteData/NHCsite_metadata.csv") %>%
 # slice(c(1:7))
 

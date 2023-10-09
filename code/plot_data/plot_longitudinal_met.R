@@ -1,10 +1,10 @@
 # longitudinal exploration of 2019 NHC metabolism
-# plots of metabolism vs distance binned by month and season 
+# plots of metabolism vs distance binned by month and season
 # 3d plots of metabolic surface through space and time
 library(tidyverse)
 library(ggpubr)
 
-# setwd("C:/Users/Alice Carter/Dropbox (Duke Bio_Ea)/projects/NHC_2019_metabolism/data")
+# setwd("C:/Users/alice.carter/git/nhc_50yl/src/data")
 source("src/metabolism/inspect_model_fits.r")
 
 # it would be nice to recompile the metabolism file so it has the PWC site
@@ -12,10 +12,10 @@ dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer.rds")
 sites <- read_csv("data/siteData/NHCsite_metadata.csv") %>%
   slice(c(1:7))
 
-preds <- dat$preds %>% 
+preds <- dat$preds %>%
   filter(year == 2019)
 
-dists <- sites %>% 
+dists <- sites %>%
   select(site = sitecode, distance_m) %>%
   mutate(distance_m = 8450 - distance_m)
 
@@ -29,7 +29,7 @@ seas <- preds %>%
                             month %in% c(9,10,11) ~'autumn'))
 
 ggplot(preds, aes(factor(distance_m), GPP,  fill = month)) +
-  geom_boxplot() 
+  geom_boxplot()
   geom_smooth(se = FALSE, method = 'lm')
 er <- ggplot(preds, aes(distance_m, ER, group = month, color = month)) +
   geom_point() +
@@ -40,7 +40,7 @@ gpp <- ggplot(preds, aes(distance_m, GPP, group = month, color = month)) +
 
 ggpubr::ggarrange(gpp, er, ncol = 1, common.legend = TRUE)
 
-# 3D metabolism plot 
+# 3D metabolism plot
 
 library(plotly)
 even_dists <- data.frame(distance_m = seq(0, 8450, by = 10))
@@ -104,7 +104,7 @@ axz_ER <- list(
   title = "ER gO2/m2/d"
 )
 
-gpp<- plot_ly(z = GPP_filled, type = 'surface') %>% 
+gpp<- plot_ly(z = GPP_filled, type = 'surface') %>%
   layout(scene = list(xaxis=axx,yaxis=axy,zaxis=axz_GPP))
 
 er<- plot_ly(z = ER_filled, type = 'surface') %>%

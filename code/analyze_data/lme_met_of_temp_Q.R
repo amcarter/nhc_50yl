@@ -2,12 +2,12 @@
 library(lme4)
 library(tidyverse)
 library(lubridate)
-setwd('C:/Users/Alice Carter/git/nhc_50yl/')
+setwd('C:/Users/alice.carter/git/nhc_50yl/src')
 
 dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer.rds")
 sites <- read_csv('data/siteData/NHCsite_metadata.csv') %>%
   slice(c(1:5, 7))
-met <- dat$preds 
+met <- dat$preds
 
 dd <- tibble()
 for(s in sites$sitecode){
@@ -17,7 +17,7 @@ for(s in sites$sitecode){
 }
 
 d <- dd %>%
-  mutate(DateTime_EST = with_tz(DateTime_UTC, 'EST'), 
+  mutate(DateTime_EST = with_tz(DateTime_UTC, 'EST'),
          date = as.Date(DateTime_EST, tz = 'EST')) %>%
   group_by(site, date) %>%
   summarize(across(any_of(c('depth', 'avg_velocity', 'light')), mean, na.rm = T))
@@ -27,7 +27,7 @@ met <- met %>%
   mutate(depth = case_when(is.na(depth) ~ depth_hall,
                            TRUE ~ depth)) %>%
   select(-depth_hall)
-                 
+
 # subset out modern dataset to build model
 mm <- met %>%
   filter(era == 'now') %>%
@@ -61,7 +61,7 @@ write_csv(dat, 'data/metabolism/metabolism_and_drivers.csv')
 
 fall <- dat %>%
   filter(month %in% c(10)) %>%
-  select(date, GPP, ER, logQ, temp.water, site, year, logQ_mean, 
+  select(date, GPP, ER, logQ, temp.water, site, year, logQ_mean,
          depth_mean, distance_m, slope)
 
 ggplot(fall, aes(temp.water, ER, col = factor(year)))+
@@ -69,18 +69,18 @@ ggplot(fall, aes(temp.water, ER, col = factor(year)))+
   facet_wrap(year~site, scales = 'free_x')
 # scale data to model:
 
-sfall <- fall %>% 
+sfall <- fall %>%
   mutate(across(.cols = all_of(c('GPP', 'ER', 'temp.water')),
                 .fns = scale))
 # model for ER ####
 
-mER = lmer(ER ~ temp.water + (temp.water|slope) + (temp.water|logQ_mean), 
+mER = lmer(ER ~ temp.water + (temp.water|slope) + (temp.water|logQ_mean),
            data = sfall)
 summary(mER)$coeff
 confint(mER)
 ranef(mER)
 
-ER_mod <- predict(mER) 
+ER_mod <- predict(mER)
 tmp <- data.frame(index = as.numeric(names(ER_mod)), ER_mod = ER_mod)
 sfall <- sfall %>%
   mutate(index = seq(1:nrow(sfall))) %>%
@@ -91,12 +91,12 @@ ggplot(sfall, aes(ER, ER_mod, col = site))+
   geom_point() + geom_smooth(method = lm) +
   geom_abline(slope = 1, intercept = 0)
 
-# It seems like there is actually no relationship between temperature and ER in  the 
+# It seems like there is actually no relationship between temperature and ER in  the
 #  fall at the three run sites. The model is unable to predict at these sites (unsurprisingly)
 
 # My next step would be to incorporate depth or slope (whichever best differentiates between
 # the two sets of sites). I think this type of model will make this a much better paper and is
-# worth doing. 
+# worth doing.
 
 # another possibility is to try something like a random forest or other machine
 # learning approach, I would just have to see how much of an investment something

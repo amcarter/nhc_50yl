@@ -1,5 +1,5 @@
 # gap fill level data for unhc and nhc
-setwd('C:/Users/alice.carter/git/nhc_50yl/')
+setwd('C:/Users/alice.carter/git/nhc_50yl/src')
 
 # plot_pres <- function(NHC, waterpres = "level_m", airpres = "waterdepth_m", extra = NA){
 #   if(is.na(extra)){

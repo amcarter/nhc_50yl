@@ -1,6 +1,6 @@
 # Update rating curve file with new discharge measurement
-source("C:/Users/alice.carter/git/nhc_50yl/src/download_format_data/calc_discharge_from_crosssection.r")
-setwd('C:/Users/alice.carter/git/nhc_50yl/')
+source("C:/Users/alice.carter/git/nhc_50yl/src/code/download_format_data/calc_discharge_from_crosssection.r")
+setwd('C:/Users/alice.carter/git/nhc_50yl/src')
 
 # # 1. initial calcs to create rc_sheet ####
 # # only run this section if you have corrected/updated all previous data:

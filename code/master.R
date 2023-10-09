@@ -1,7 +1,6 @@
 #0. setup ####
-# setwd('C:/Users/Alice Carter/git/nhc_50yl/')
-setwd('C:/Users/alice.carter/git/nhc_50yl')
-source('src/helpers.R')
+setwd('C:/Users/alice.carter/git/nhc_50yl/src')
+source('code/helpers.R')
 library(lubridate)
 library(tidyverse)
 library(zoo)

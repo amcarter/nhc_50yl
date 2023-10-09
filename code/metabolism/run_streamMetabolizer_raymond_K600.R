@@ -15,7 +15,7 @@ library(dygraphs)
 # library(imputeTS)
 # library(parallel)
 
-setwd("C:/Users/alice.carter/git/nhc_50yl/data")
+setwd("C:/Users/alice.carter/git/nhc_50yl/src/data")
 # setwd("~Desktop/donkey")
 ## Read in Data ####
 sites <- read_csv("siteData/NHCsite_metadata.csv") %>%

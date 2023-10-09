@@ -3,7 +3,7 @@
 # A Carter
 library(tidyverse)
 library(lubridate)
-setwd('C:/Users/alice.carter/git/nhc_50yl')
+setwd('C:/Users/alice.carter/git/nhc_50yl/src')
 
 # Load metabolism predictions:
 dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_O2.rds")

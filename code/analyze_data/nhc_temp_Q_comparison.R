@@ -302,7 +302,7 @@ write_csv(Q_stats, "../NHC_2019_metabolism/data/rating_curves/Q_stats_nowthen_ha
 
 # load Hall rating curve, calculate equation
 # 
-# hall_rc <- read_csv("C:/Users/Alice Carter/git/nhc_50yl/hall_50yl/code/data/hall/hall_figure5_digitized_ratingcurve.csv")
+# hall_rc <- read_csv("C:/Users/alice.carter/git/nhc_50yl/hall_50yl/code/data/hall/hall_figure5_digitized_ratingcurve.csv")
 # # Calculate discharge from rating curves
 # # Q = a * L ^ b
 # 
@@ -365,7 +365,7 @@ write_csv(Q_stats, "../NHC_2019_metabolism/data/rating_curves/Q_stats_nowthen_ha
 # lines(seq(0.5, 1.50, by = .1), exp(a_n + b_n * log(seq(.5, 1.5, by = .1))))
 # 
 # # find what flow is at NHC when flow at CBP is 1 m3s
-# # qq <- read_csv("C:/Users/Alice Carter/Dropbox (Duke Bio_Ea)/projects/NHC_2019_metabolism/data/siteData/interpolatedQ_allsites.csv") %>%
+# # qq <- read_csv("C:/Users/alice.carter/git/nhc_50yl/src/data/siteData/interpolatedQ_allsites.csv") %>%
 # #   filter(CBP.Q <=3)
 # # plot(qq$CBP.Q, qq$NHC.Q)
 # # abline(0,1, col = 2, lty = 2, lwd = 1)

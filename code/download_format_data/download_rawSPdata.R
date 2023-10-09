@@ -35,7 +35,7 @@ for(i in 1:nrow(sites)){
                                              dd$DateTime_UTC[nrow(dd)],
                                              by = "15 min"))
   dd <- left_join(datetimes, dd, by = "DateTime_UTC")
-  write_csv(dd, paste0("C:/Users/alice.carter/git/nhc_50yl/data/metabolism/raw/",
+  write_csv(dd, paste0("C:/Users/alice.carter/git/nhc_50yl/src/data/metabolism/raw/",
                        dd$site[1], "_", as.Date(dat$specs$enddate), ".csv"))
 
 }

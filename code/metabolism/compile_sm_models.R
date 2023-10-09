@@ -1,7 +1,7 @@
 ## Model Metabolism #
 # adapted from JRB script
 # This version runs metabolism on NHC sites using the K600 values from Hall 1972
-setwd('C:/Users/alice.carter/git/nhc_50yl/')
+setwd('C:/Users/alice.carter/git/nhc_50yl/src')
 source("src/metabolism/inspect_model_fits.r")
 # Compile model outputs ####
 

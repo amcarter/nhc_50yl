@@ -4,11 +4,11 @@ library(mice)
 
 setwd('C:/Users/alice.carter/git/ghg_patterns_nhc/')
 # source('src/helpers.R')
-# filelist <- list.files('../nhc_50yl/data/metabolism/raw')
+# filelist <- list.files('../nhc_50yl/src/data/metabolism/raw')
 # d <- data.frame()
 # for(i in 1:length(filelist)){
 #     name <- filelist[i]
-#     dd <- read_csv(paste0('../nhc_50yl/data/metabolism/raw/', name))
+#     dd <- read_csv(paste0('../nhc_50yl/src/data/metabolism/raw/', name))
 #     d <- bind_rows(d, dd)
 # }
 # d <- filter(d, site != 'PWC')
@@ -19,7 +19,7 @@ setwd('C:/Users/alice.carter/git/ghg_patterns_nhc/')
 # write_csv(d, 'data/processed_sensor/compiled_nhc_dat.csv')
 d = read_csv('data/processed_sensor/compiled_nhc_dat.csv')
 
-d <- read_csv('../nhc_50yl/data/metabolism/raw/CBP_2020-03-11.csv')
+d <- read_csv('../nhc_50yl/src/data/metabolism/raw/CBP_2020-03-11.csv')
 d = d %>%
     select(DateTime_UTC, site, DO.obs, discharge) %>%
     pivot_wider(names_from = site,
@@ -61,7 +61,7 @@ write_csv(dd, 'data/processed_sensor/interp_DO_march2020.csv')
 
 # replace in processed files:
     site = 'WBP'
-    dat <- read_csv(paste0("../nhc_50yl/data/metabolism/processed/",
+    dat <- read_csv(paste0("../nhc_50yl/src/data/metabolism/processed/",
                            site, ".csv"), guess_max = 10000)
     dat <- full_join(dat, tmp, by = 'DateTime_UTC') %>%
         mutate(DO.sat = ifelse(!is.na(DO.sat), DO.sat, DO.sat2),

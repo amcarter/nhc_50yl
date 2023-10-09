@@ -11,8 +11,8 @@ library(LakeMetabolizer)
 # library(xts)
 # library(zoo)
 #
-# setwd("C:/Users/Alice Carter/Dropbox (Duke Bio_Ea)/projects/NHC_2019_metabolism/data/")
-# source("../src/helpers.R")
+# setwd("C:/Users/alice.carter/git/nhc_50yl/src/data/")
+# source("../code/helpers.R")
 
 # 1. load raw data files and metadata ####
 # sites <- read_csv("siteData/NHCsite_metadata.csv")

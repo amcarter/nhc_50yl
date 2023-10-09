@@ -1,7 +1,7 @@
 # Script for simulating data and running different versions of ER models
 # A Carter
 # Feb 2022
-setwd('C:/Users/alice.carter/git/nhc_50yl/')
+setwd('C:/Users/alice.carter/git/nhc_50yl/src')
 library(tidyverse)
 library(rstan)
 
