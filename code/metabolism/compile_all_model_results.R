@@ -1,5 +1,5 @@
 ## convert model results to Carbon and compile all methods/years
-source("src/metabolism/inspect_model_fits.r")
+source("code/metabolism/inspect_model_fits.r")
 # Compile model outputs ####
 # convert = FALSE
 convert = TRUE

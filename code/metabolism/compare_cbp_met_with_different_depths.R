@@ -1,7 +1,7 @@
 ## Compare model results for metabolism run at CBP site with my depths
 #   and with the median depth from Hall 1970
 
-source("src/metabolism/inspect_model_fits.r")
+source("code/metabolism/inspect_model_fits.r")
 # Compile model outputs ####
 
 flow_dates <- read_csv("data/rating_curves/flow_dates_filter.csv")

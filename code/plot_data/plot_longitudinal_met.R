@@ -5,7 +5,7 @@ library(tidyverse)
 library(ggpubr)
 
 # setwd("C:/Users/alice.carter/git/nhc_50yl/src/data")
-source("src/metabolism/inspect_model_fits.r")
+source("code/metabolism/inspect_model_fits.r")
 
 # it would be nice to recompile the metabolism file so it has the PWC site
 dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer.rds")

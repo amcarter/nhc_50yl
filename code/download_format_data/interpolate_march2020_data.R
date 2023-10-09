@@ -3,7 +3,7 @@ library(lubridate)
 library(mice)
 
 setwd('C:/Users/alice.carter/git/ghg_patterns_nhc/')
-# source('src/helpers.R')
+# source('code/helpers.R')
 # filelist <- list.files('../nhc_50yl/src/data/metabolism/raw')
 # d <- data.frame()
 # for(i in 1:length(filelist)){

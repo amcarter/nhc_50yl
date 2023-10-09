@@ -2,7 +2,7 @@
 # adapted from JRB script
 # This version runs metabolism on NHC sites using the K600 values from Hall 1972
 setwd('C:/Users/alice.carter/git/nhc_50yl/src')
-source("src/metabolism/inspect_model_fits.r")
+source("code/metabolism/inspect_model_fits.r")
 # Compile model outputs ####
 
 flow_dates <- read_csv("data/rating_curves/flow_dates_filter.csv")

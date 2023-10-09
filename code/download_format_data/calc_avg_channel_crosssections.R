@@ -6,7 +6,7 @@
 # library(ggplot2)
 # library(ggpubr)
 #
-# source("src/helpers.R")
+# source("code/helpers.R")
 source("C:/Users/alice.carter/git/nhc_50yl/src/code/download_format_data/calc_discharge_from_crosssection.r")
 
 # 1. load raw data files and metadata ####
