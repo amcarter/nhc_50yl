@@ -1,0 +1,385 @@
+---
+title: "ER model for NHC"
+author: "Alice Carter"
+date: "2/2022"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = 'C:/Users/alice.carter/git/nhc_50yl')
+setwd('C:/Users/alice.carter/git/nhc_50yl/')
+source('../autotrophic_rivers/src/stan_helpers.R')
+library(tidyverse)
+library(rstan)
+library(bayesplot)
+
+dat <- read_csv('data/met_and_drivers_for_model.csv')
+```
+
+## Overview  
+We are building a model of ecosystem respiration based on physical drivers using our modern dataset from New Hope Creek. We will then use this model to predict respiration rates that we would have expected in 1969 based on this modern understanding. To test our understanding of how the ecosystem metabolism has changed over 50 years, we will compare these predictions to measured rates of ER in the past.
+
+Outline:  
+1. Build a state space model of respiration as a function of discharge, water temperature, and litterfall with a latent carbon storage state.   
+2. Test model on simulated data.  
+3. Adapt model to incorporate missing data.  
+4. Fit model to modern NHC data at one site.  
+
+Next steps:  
+- Expand model to a hierarchical structure that allows for information sharing across sites.  
+- Use model to predict rates of ER in the past.  
+- Compare monthly averaged rates to measured past values.
+
+## Model Description
+
+We will model respiration ($R$) as a function of the productivity ($P$), the carbon storage available for respiration ($C$), and a temperature ($T$) dependent decomposition rate ($K$). The carbon stored in the stream is a latent state in the model that will evolve as a random walk with removal through discharge and respiration, and additions through annual litterfall ($L$).   
+  
+#### Process model  
+
+$K_t = K_{20} \times e^{\frac{-E}{k_b}(\frac{1}{T_t} - \frac{1}{293})}$
+
+$R_t = - AR \times P_t - C_t * K_t$
+
+$C_t = (C_{t-1} + P_{t-1} + L_t + R_{t-1}) \times (1 - \beta Q_t) \times \epsilon_t$
+
+$\epsilon_t \sim lognormal(0, \sigma_{proc})$
+
+Where the fraction of autotrophic respiration ($AR = 0.5$), the activation energy for heterotrophic respiration ($E = 0.63 eV$), and Boltzmann's constant ($k_b = 8.617 \times 10^{-5} eV/K$) are constants, and the decomposition rate at 20 $^{\circ} C$ ($K_{20}$) and the fraction of organic carbon removed by the largest storm ($\beta$) are parameters. Litterfall ($L$) is a fixed constant $l$ representing the annual litterfall (500 g/m2/y) divided by the number of days of leaf off (20 days) multiplied by a vector of zeros and ones representing the time period of leaf off.  
+  
+#### Observation model
+
+$R_{obs,t} \sim N(R_t, \sigma_{obs})$  
+  
+#### Priors
+
+$\begin{aligned}\beta &\sim U(0, 1) & \\ \sigma_{proc} &\sim N(0,0.1) &\sigma_{proc} > 0 \\ \sigma_{obs} &\sim N(0.08,0.02) &\sigma_{obs} > 0 \end{aligned}$  
+  
+## Simulate data
+
+Use real input data to simulate ER and GPP:
+
+```{r, echo = FALSE}
+
+# define litterfall to be 20 days from Oct 5th - 24th with the total annual litter = 500 gC/m2/y, so daily litterfall = 25 gC/m2/d
+cbp <- dat %>%
+    filter(site == 'CBP') %>%
+    mutate(ER = ifelse(ER < -4, NA, ER))
+cbp_miss <- cbp %>%
+  select(-site) %>%
+  arrange(date) %>%
+  mutate(across(c(-date, -ER), zoo::na.approx, na.rm = F),
+         litter = case_when(date >= as.Date('2019-10-05') & 
+                              date <= as.Date('2019-10-24') ~ 25,
+                            TRUE ~ 0),
+         logQ = log(discharge),
+         tempK = temp.water + 273) %>%
+  slice(-1) %>%
+  filter(!is.na(GPP))
+
+cbp <- mutate(cbp_miss, ER = zoo::na.approx(ER), na.rm = F) %>%
+  filter(!is.na(ER))
+
+cbp %>%
+  select(date, temp = temp.water, logQ, light = PAR_surface, litter, GPP, ER) %>%
+  pivot_longer(-date, names_to = 'variable', values_to = 'value') %>%
+  ggplot(aes(date, value, col = variable)) +
+  geom_line() +
+  facet_wrap(.~variable, nrow = 4, scales = 'free_y')
+  
+```
+
+```{r}
+N <- nrow(cbp)
+light = cbp$PAR_surface/max(cbp$PAR_surface)
+Q = cbp$discharge/max(cbp$discharge)
+temp = cbp$temp.water + 273
+litter = cbp$litter
+
+# simulate GPP
+P <- numeric()
+P[1] = 0.5
+for(i in 2:N){
+  P[i] = 0.5 * P[i-1] + 0.8 * light[i] + rnorm(1,0, 0.05)
+}
+
+# define parameters
+K20 = .01  # Heterotrophic respiration at 20 C
+beta = 0.8   # Percent removal of organic carbon from max storm
+sigma_proc = .01
+sigma_obs = 0.08 
+
+# Constants
+E = 0.63              # activation energy for heterotrophic respiration
+k_b = 8.6173 * 10^-5  # Boltzmann's constant in eV/K
+AR = 0.5              # the fraction of GPP respired by autotrophs
+
+# Process model
+C = numeric()
+R = numeric()
+R_obs = numeric()
+K_t = numeric()
+C[1] = 200 # initial accessible carbon storage in stream
+K_t[1] = K20 * exp(-E/k_b *(1/temp[1] - 1/293))
+R[1] = -AR * P[1] - K_t[1] * C[1]
+
+for(i in 2:N){
+  C[i] = exp(rnorm(1, log((C[i-1] + litter[i] + R[i-1] + P[i-1])*(1-beta*Q[i])), sigma_proc))
+  K_t[i] = K20 * exp(-E/k_b * (1/temp[i] - 1/293))
+  R[i] = -AR * P[i] - K_t[i]*C[i]
+}
+
+R_obs = rnorm(N, R, sigma_obs)
+
+cbp_mod <- data.frame(date = cbp$date, GPP = P, ER = R_obs, C = C)
+
+pivot_longer(cbp_mod, -date, names_to = 'var', values_to = 'value') %>%
+  ggplot(aes(date, value, col = var)) +
+  geom_line()+
+  facet_wrap(.~var, scales = 'free_y', nrow = 3)
+
+
+```
+
+
+
+## State space ER model:
+### Stan Code
+
+```{r, comment='', echo = FALSE}
+cat(read_lines('src/model/stan/ss_ER.stan'), sep = '\n')
+```
+
+```{r, eval = FALSE}
+stan_dat <- list(N = length(R_obs), R_obs = R_obs, P_obs = P,
+                 tempK = temp, Q = Q, litter = litter, C0 = C[1])
+
+mod2 <- stan('src/model/stan/ss_ER.stan', 
+            data = stan_dat, init = 0,
+            chains = 4, cores = 4, 
+            warmup = 500, iter = 1000)
+```
+
+```{r, echo = FALSE}
+# saveRDS(mod2, 'src/model/model_runs/simulated_ss_ER.rds')
+mod2 <- readRDS('src/model/model_runs/simulated_ss_ER.rds')
+print(mod2, pars = c('beta', 'sigma_obs', 'sigma_proc'))
+# traceplot(mod2, ncol = 1, pars=c('beta', 'sigma_obs', 'sigma_proc'))
+plot_post_sim(mod2, pars = c('beta', 'sigma_obs', 'sigma_proc'), 
+              vals = c(beta, sigma_obs, sigma_proc), xlim = c(0,1))
+```
+
+
+
+```{r, include = FALSE, echo = FALSE, eval = FALSE}
+fit <- summary(mod2)
+modC <- fit$summary[4:363,1] 
+modC_sd <- fit$summary[4:363,3]
+
+plot(cbp$date, C, type = 'l', ylab = 'Carbon (g/m2)', xlab = 'Date')
+points(cbp$date, modC, col = 'steelblue', pch = 19)
+polygon(c(cbp$date, rev(cbp$date)), c(modC - modC_sd, rev(modC + modC_sd)), 
+        col = alpha('steelblue', 0.3), border = NA)
+legend('topleft', c('underlying state', 'modeled'), 
+       lty = c(1,0), pch = c(NA,19), col = c('black', 'steelblue'), bty = 'n')
+
+```
+
+
+
+## Model run on NHC data
+
+```{r, eval = FALSE}
+stan_dat <- list(N = nrow(cbp), R_obs = cbp$ER, P_obs = cbp$GPP, 
+                 tempK = cbp$tempK, Q = cbp$discharge/max(cbp$discharge), 
+                 litter = cbp$litter, C0 = 200)
+
+cbp_mod <- stan('src/model/stan/ss_ER.stan',
+                data = stan_dat, init = 0,
+                chains = 4, cores = 4, 
+                warmup = 500, iter = 2000)
+
+```
+
+```{r, echo = FALSE}
+# saveRDS(cbp_mod, 'src/model/model_runs/cbp_ss_ER.rds')
+cbp_mod <- readRDS('src/model/model_runs/cbp_ss_ER.rds')
+print(cbp_mod, pars = c('beta', 'sigma_obs', 'sigma_proc'))
+traceplot(cbp_mod, ncol = 1, pars=c('beta', 'sigma_obs', 'sigma_proc'))
+```
+
+
+```{r}
+fit <- summary(cbp_mod)
+modC <- fit$summary[4:363,1] 
+modC_sd <- fit$summary[4:363,3]
+mod_R <- -AR * cbp$GPP - K20* exp(-E/k_b*(1/cbp$tempK - 1/293)) * modC
+mod_R <- rnorm(length(mod_R), mod_R, fit$summary[3,1])
+
+cbp_ests <- cbp %>%
+  mutate(C_modeled = modC, ER_modeled = mod_R, 
+         GPP_modeled = NA_real_, C_measured = NA_real_) %>%
+  rename(ER_measured = ER, GPP_measured = GPP) 
+cbp_ests%>%
+  pivot_longer(ends_with(c("_measured", "_modeled")), names_to = c('variable', 'est'),
+                         names_sep = '_', values_to = 'value') %>%
+  ggplot(aes(date, value, col = est)) +
+  geom_line() +
+  facet_wrap(.~variable, scales = 'free', ncol = 1)
+
+```
+
+## Missing data model run on NHC data
+
+```{r, eval = FALSE}
+cbp_miss <- mutate(cbp_miss, miss_vec = ifelse(is.na(ER),1,0))
+
+stan_dat <- list(N = nrow(cbp_miss), R_obs = zoo::na.approx(cbp_miss$ER),
+                 P_obs = cbp_miss$GPP, tempK = cbp_miss$tempK, 
+                 Q = cbp_miss$discharge/max(cbp_miss$discharge), 
+                 litter = cbp_miss$litter, C0 = 200,
+                 miss_vec = cbp_miss$miss_vec)
+
+cbp_miss_mod <- stan('src/model/stan/ss_ER_missingdata.stan',
+                data = stan_dat, init = 0,
+                chains = 4, cores = 4,
+                warmup = 500, iter = 1000)
+
+```
+
+```{r, echo = FALSE}
+# saveRDS(cbp_miss_mod, 'src/model/model_runs/cbp_ss_ER_missingdata.rds')
+cbp_miss_mod <- readRDS('src/model/model_runs/cbp_ss_ER_missingdata.rds')
+print(cbp_miss_mod, pars = c('beta', 'sigma_obs', 'sigma_proc'))
+traceplot(cbp_miss_mod, ncol = 1, pars=c('beta', 'sigma_obs', 'sigma_proc'))
+```
+
+
+```{r}
+fit <- summary(cbp_miss_mod)
+modC <- fit$summary[4:363,1] 
+modC_sd <- fit$summary[4:363,3]
+mod_R <- -AR * cbp_miss$GPP - K20* exp(-E/k_b*(1/cbp_miss$tempK - 1/293)) * modC
+mod_R <- rnorm(length(mod_R), mod_R, fit$summary[3,1])
+
+cbp_ests <- cbp_miss %>%
+  mutate(C_modeled = modC, ER_modeled = mod_R, 
+         GPP_modeled = NA_real_, C_measured = NA_real_) %>%
+  rename(ER_measured = ER, GPP_measured = GPP) 
+cbp_ests%>%
+  pivot_longer(ends_with(c("_measured", "_modeled")), names_to = c('variable', 'est'),
+                         names_sep = '_', values_to = 'value') %>%
+  ggplot(aes(date, value, col = est)) +
+  geom_line() +
+  facet_wrap(.~variable, scales = 'free', ncol = 1)
+
+```
+
+
+
+### Compare predictions today and in 1970
+
+```{r}
+hall_dat <- read_csv('data/hall/hall_discharge_temp_daily.csv')
+light <- cbp %>% mutate(doy = as.numeric(format(date, '%j'))) %>%
+  select(doy, PAR_surface) %>%
+  group_by(doy) %>%
+  summarize(PAR_surface = mean(PAR_surface, na.rm = T))
+hall_dat <- hall_dat %>%
+  mutate(doy = as.numeric(format(date, '%j')),
+         litter = case_when(doy >= 278 &
+                              doy <= 297 ~ 25,
+                            TRUE ~ 0),
+         logQ = log(discharge_m3s)) %>%
+  left_join(light, by = 'doy') %>%
+  select(-notes) %>%
+  mutate(across(-date, zoo::na.approx, na.rm = F)) %>% 
+  slice(1:836)
+  
+
+N <- nrow(hall_dat)
+light = zoo::na.approx(hall_dat$PAR_surface/max(hall_dat$PAR_surface, na.rm = T), na.rm = F)
+Q = zoo::na.approx(hall_dat$discharge_m3s/max(hall_dat$discharge_m3s, na.rm = T), na.rm = F)
+temp = zoo::na.approx(hall_dat$water_temp_C, na.rm = F) + 273
+litter = hall_dat$litter
+
+# simulate GPP
+P_hall <- numeric()
+P_hall[1] = 0.5
+for(i in 2:N){
+  P_hall[i] = 0.5 * P_hall[i-1] + 0.8 * light[i] + rnorm(1,0, 0.05)
+}
+P_hall <- P_hall * .75
+# define parameters
+K20 = .01  # Heterotrophic respiration at 20 C
+beta = 0.2   # Percent removal of organic carbon from max storm
+sigma_proc = 0.22
+sigma_obs = 0.16 
+
+# Constants
+E = 0.63              # activation energy for heterotrophic respiration
+k_b = 8.6173 * 10^-5  # Boltzmann's constant in eV/K
+AR = 0.5              # the fraction of GPP respired by autotrophs
+
+# Process model
+C_hall = numeric()
+R_hall = numeric()
+R_hall_obs = numeric()
+K_t = numeric()
+C_hall[1] = 200 # initial accessible carbon storage in stream
+K_t[1] = K20 * exp(-E/k_b *(1/temp[1] - 1/293))
+R_hall[1] = -AR * P_hall[1] - K_t[1] * C_hall[1]
+
+for(i in 2:N){
+  C_hall[i] = exp(rnorm(1, log((C_hall[i-1] + litter[i] + R_hall[i-1] + P_hall[i-1])*(1-beta*Q[i])), sigma_proc))
+  K_t[i] = K20 * exp(-E/k_b * (1/temp[i] - 1/293))
+  R_hall[i] = -AR * P_hall[i] - K_t[i]*C_hall[i]
+}
+
+R_hall_obs = rnorm(N, R_hall, sigma_obs)
+
+data.frame(date = hall_dat$date, P = P_hall, R = R_hall_obs, C = C_hall) %>%
+  pivot_longer(-date, names_to = 'var', values_to = 'value') %>%
+  ggplot(aes(date, value, col = var)) +
+  geom_line()+
+  facet_wrap(.~var, scales = 'free_y', nrow = 3)
+```
+
+### Metabolism hindcast:
+
+```{r}
+hall <- hall_dat %>%
+  mutate(ER = R_hall_obs, 
+         GPP = P_hall,
+         C = C_hall) %>%
+  group_by(doy) %>%
+  summarize(across(-date, mean, na.rm = T))%>%
+  ungroup() %>%
+  mutate(era = "1969")
+
+comp <- cbp_ests %>%
+  mutate(doy = as.numeric(format(date, '%j'))) %>%
+  group_by(doy) %>%
+  summarize(across(-date, mean, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(era = "2019") %>%
+  rename(GPP = GPP_measured, ER = ER_modeled, C = C_modeled) %>%
+  bind_rows(hall) %>%
+  pivot_longer(cols = c('GPP', 'ER', 'C'), names_to = 'variable', values_to = 'val')
+
+comp %>%
+  ggplot(aes(doy, val, col = era)) +
+  geom_line()+
+  facet_wrap(.~variable, scales = 'free_y', nrow = 3)
+```
+
+Most of the time, the carbon and ER estimates for 1969 are out of control because the process error is so high. 
+
+
+
+### Next steps:  
+1. Implement missing data code to estimate missing parameters
+2. Incorporate a model for GPP
+3. Fix discharge and eliminate unrealistic metabolism estimates
+4. Run across sites
+5. Add hierarchical variable to describe geomorphology across sites
+6. compare differenced ER timeseries with modeled.

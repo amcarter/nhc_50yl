@@ -1,0 +1,179 @@
+---
+title: "GPP model for NHC"
+author: "Alice Carter"
+date: "2/15/2022"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = 'C:/Users/alice.carter/git/nhc_50yl')
+setwd('C:/Users/alice.carter/git/nhc_50yl')
+source('../autotrophic_rivers/src/stan_helpers.R')
+library(tidyverse)
+library(rstan)
+```
+Task: build a basic hierarchical model of productivity as a function of light, temperature, and discharge.
+
+### Initial model
+
+Model productivity $P$ as a function of an underlying biomass term $(B)$ with light $(L)$ and temperature $(T)$ dependent photosynthetic rates and a biomass loss determined by discharge $(Q)$.
+
+\[B_A(t+1) = B_A(t) + P(t) + AR(t) - L_A(t) - S_A(t) \]
+\[P(t) = P_{20} \times \theta_A ^ {T_t - 20} \frac{PAR_t}{PAR_t + K_{PAR}} \times B_A(t) \times (1 - \frac{B_a(t)}{K_{D,a}})\]
+\[AR(t) = AR_f \cdot P_t\]
+\[L_A(t) = \mu_L B_A(t)\]
+\[S_A(t) = \mu_s f_s(t) B_A(t)\]
+\[f_s(t) = (\frac{\tau(t) - \tau_0}{\tau_{max} - \tau_0})^2, \tau(t) = \gamma_wr(t)s\]
+
+Simulate some data based on real driver variables:
+
+```{r}
+
+dat <- read_csv("data/metabolism/metabolism_and_drivers.csv")
+drivers <- dat %>%
+  filter(site == 'CBP') %>%
+  mutate(GPP_sd = (GPP.upper - GPP.lower)*.33/.95) %>%
+  select(date, PAR_surface, LAI, temp.water, discharge, GPP, GPP_sd) %>%
+  mutate(across(-date, zoo::na.approx, na.rm = F),
+         logQ = (log(discharge)),
+         tQ = discharge/max(discharge, na.rm = T),
+         light = PAR_surface/max(PAR_surface, na.rm = T),
+         tempK = temp.water+ 273) %>%
+  arrange(date) %>%
+  group_by(date) %>%
+  summarize(across(everything(), mean, na.rm = T)) %>%
+  mutate(across(any_of(c('tempK', 'tQ', 'light')), zoo::na.approx, na.rm = F)) %>%
+  slice(-1)
+
+beta = 0.8
+r = .06
+lambda = -.01
+sig_obs = 0.05
+sig_proc = 0.05
+
+E = 0.35
+k_b = 8.6173 * 10 ^ -5
+P_20 = 1
+
+B = numeric()
+pred_P = numeric()
+
+B[1] = rnorm(1, log(drivers$GPP[1]/drivers$light[1]), 1)
+pred_P[1] = drivers$light[1] * exp(B[1]) * P_20 * exp(E/k_b *( 1/293 - 1/drivers$tempK[1]))
+
+N = nrow(drivers)
+
+for (i in 2:N){
+  B[i] = rnorm(1, ((B[i-1] + r + lambda * exp(B[i-1])) * (1-beta*drivers$tQ[i])), sig_proc)
+  pred_P[i] = drivers$light[i] * exp(B[i]) * P_20 * exp(E/k_b *(1/293 - 1/drivers$tempK[i]))
+}
+
+P_obs <- rnorm(N, pred_P, sig_obs)
+
+plot(drivers$date, P_obs)
+lines(drivers$date, drivers$GPP)
+
+
+plot(drivers$date, B)
+```
+
+
+## Stan code
+
+```{r, comment='', echo = FALSE}
+cat(read_lines('src/model/stan/ss_GPP.stan'), sep = '\n')
+cat(read_lines('src/model/stan/Stan_ProductivityModel2_Ricker_fixedinit_obserr.stan'), sep = '\n')
+```
+
+```{r}
+stan_dat <- list(N = nrow(drivers), P_obs = P_obs, light = drivers$light,
+                 tempK = drivers$tempK, Q = drivers$tQ)
+stan_dat <- list(N = nrow(drivers), P_obs = drivers$GPP, light = drivers$light,
+                 tempK = drivers$tempK, Q = drivers$tQ)
+
+mod <- stan('src/model/stan/ss_GPP.stan', 
+            data = stan_dat, init = 0,
+            chains = 1, cores = 4, 
+            warmup = 200, iter = 500)
+
+# try running Heili's ricker model
+
+stan_dat <- list(Ndays = nrow(drivers), light = drivers$light, GPP = drivers$GPP, 
+                 GPP_sd = drivers$GPP_sd,
+                 tQ = drivers$tQ)
+
+  mod <- stan('src/model/stan/Stan_ProductivityModel2_Ricker_fixedinit_obserr.stan', 
+            data = stan_dat,# init = 0,
+            chains = 4, cores = 4, 
+            warmup = 200, iter = 500)
+
+```
+
+```{r, echo = FALSE}
+saveRDS(mod, 'src/model/model_runs/simulated_ss_GPP.rds')
+mod <- readRDS('src/model/model_runs/simulated_ss_GPP.rds')
+print(mod, pars = c( 'r','lambda',  'sig_p', 'sig_o'))
+print(mod, pars = c('beta', 'r','lambda',  'P_20', 'sigma_proc', 'sigma_obs'))
+traceplot(mod, ncol = 1, pars=c('phi','b_light', 'b_q', 'sigma_obs', 'sigma_proc'))
+plot_post_sim(mod, pars = c('phi', 'b_light', 'b_q', 'sigma_obs', 'sigma_proc'), 
+              vals = c(phi, b_light, b_q, sig_obs, sig_proc))
+```
+
+This model is not doing a good job of recovering the $\beta_q$ parameter
+
+### Latent biomass model
+
+An alternative approach to the phenomenological one presented above is a model that takes into account the latent biomass of primary producers to model $P$ mechanistically. Here, I am implementing a version of this type of model from Segatto et al 2020. I am choosing to leave out the density dependance of Biomass, because I do not think that NHC is ever space limited.
+
+$$P(t) = \mu_{P,20} f_{T,L}(t)B_A(t)$$
+$$f_{T,L}(t) = \theta_A^{T(t)-20} \frac{PAR(t)}{PAR(t) + K_{PAR}$$
+$$B_A(t) = B_A(t-1) + P(t-1) - e^{s(Q(t) - c)}$$
+ary(tidyverse)
+Where $\
+library(lme4)
+
+setwd('C:/Users/Alice Carter/git/nhc_50yl/')
+
+sites <- read_csv('data/siteData/NHCsite_metadata.csv') %>%
+  slice(c(1:5, 7))
+
+# Test basic GPP model
+P <- dat %>% 
+  select(date, site, GPP, GPP.lower, GPP.upper, discharge, 
+         temp.water, light, slope) %>%
+  group_by(site) %>%
+  mutate(GPP_pre = c(NA, GPP[1:(n()-1)]))
+
+P <- filter(P, site == 'CBP') %>%
+  mutate(discharge = log(discharge),
+         across(.cols = any_of(c('light', 'discharge')), .fns = scale))
+mod <- lm(GPP ~ GPP_pre + light + discharge, data = P)
+summary(mod)
+
+phi = 0.83
+b_light = 0.0364
+b_q = .06826
+p = numeric()
+p[1] = P$GPP[2]
+for(i in 2:nrow(P)){
+  p[i] = phi * p[i-1] + b_light * P$light[i] + b_q * P$discharge[i]
+}
+plot(P$date, p, ylim = c(-1,2))
+lines(P$date, P$GPP)
+plot(P$date, P$light)
+m = T))
+
+shapiro.test(dat$GPP)
+library(ggpubr)
+ggqqplot(dat$ER)
+aes(temp.water, GPP, col = factor(month))) +
+  geom_point() +
+  facet_wrap(~site, scales = 'free_y') +
+
+  geom_smooth(method = lm)
+
+mod <- brms::brm(ER ~ (1 + temp.water| slope +  logQ_mean), data = dat, iter = 1000)
+mod
+
+
+raopagaagLFMrcssResnittlstceua`td%=dae_am
