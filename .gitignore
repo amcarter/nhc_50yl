@@ -9,5 +9,7 @@ data/*
 model/model_runs
 data_bak
 *.tiff
+*.tif
+*.png
 map_files_archived/map_files
 *.zip

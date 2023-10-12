@@ -1,8 +1,11 @@
 # plot data for NHC watershed
 # precip ####
 
+library(tidyverse)
+library(zoo)
+
 nldas <- read_csv("data/watershed/nldas.csv") %>%
-  dplyr::select(datetime = DateTime, value = '1', variable) %>% 
+  dplyr::select(datetime = DateTime, value = '1', variable) %>%
   filter(!variable %in% c("wind_speed",
                           "max_relative_humidity",
                           "min_relative_humidity",
@@ -16,17 +19,17 @@ pp_annual = read_csv('data/watershed/prism_raw.csv') %>%
   group_by(year) %>%
   summarize(cumulative_precip = sum(ppt_mm)/1000)
 
-all <- nldas %>% 
+all <- nldas %>%
   pivot_wider(names_from = "variable", values_from = "value") %>%
   select(datetime, precip_mmd = precipitation_amount)
 
 p90 <- quantile(all$precip_mmd, .9, na.rm = T)
-pp <- all %>% 
+pp <- all %>%
   group_by(year = year(datetime)) %>%
   summarize(zero_days = length(which(precip_mmd == 0)),
-            cumulative_precip = sum(precip_mmd)/1000, 
+            cumulative_precip = sum(precip_mmd)/1000,
             cum90 = sum(precip_mmd[which(precip_mmd >= p90)]),
-            max_precip = max(precip_mmd, na.rm = T), 
+            max_precip = max(precip_mmd, na.rm = T),
             percent_extreme = cum90/cumulative_precip/10) %>%
   dplyr::select(-cum90, -max_precip) %>%
   bind_rows(pp_annual)
@@ -35,7 +38,7 @@ pp <- all %>%
 
 # calculate precip during 2019 drought ####
 p19 <- all %>%
-  filter(as.numeric(substr(datetime, 1, 4)) == 2019, 
+  filter(as.numeric(substr(datetime, 1, 4)) == 2019,
          as.numeric(substr(datetime, 6, 7)) %in% 9:10) %>%
   slice(c(6:37)) %>%
   mutate(pre_cum = cumsum(precip_mmd))
@@ -61,14 +64,14 @@ ncells <- sum(dat$CellTally1992, na.rm = T)
 nlcd <- dat %>%
   filter(category != 'other') %>%
   mutate(across(starts_with("Cell"), ~ . / ncells)) %>%
-  pivot_longer(cols = starts_with('Cell'), names_to = 'year', 
+  pivot_longer(cols = starts_with('Cell'), names_to = 'year',
                values_to = 'percent') %>%
   mutate(year = as.numeric(substr(year, 10, 13)),
          percent = ifelse(is.na(percent), 0, percent),
          category = factor(category, levels = c('agriculture', 'developed',
                                                 'grass_shrub', 'forested')))
 nn <- nlcd %>%
-  pivot_wider(names_from = category, values_from = percent) 
+  pivot_wider(names_from = category, values_from = percent)
 
 # Riparian Zone ####
 NPP <- read_csv("data/watershed/gee_files/npp.csv") %>%
@@ -79,12 +82,12 @@ dat <- read_csv("data/watershed/gee_files/lai.csv") %>%
   filter(!is.na(date)) %>%
   mutate(date = as.Date(date, format = "%Y_%m_%d"),
          year = year(date)) %>%
-  select(date, year,lai = Lai_500m_mean) 
+  select(date, year,lai = Lai_500m_mean)
 dates <- data.frame(date = seq(dat$date[1], dat$date[nrow(dat)], by = 'day'))
 max <- dat %>%
   group_by(year) %>%
   summarize(lai_max = quantile(lai, 0.975, na.rm = T)) %>%
-  ungroup() 
+  ungroup()
 dat <- dates %>%
   left_join(dat, by = 'date') %>%
   mutate(year = year(date),
@@ -92,7 +95,7 @@ dat <- dates %>%
          lai = na.approx(lai)) %>%
   left_join(max, by = "year") %>%
   mutate(lai = lai/lai_max) %>%
-  as.tibble()
+  as_tibble()
 
 lai <- data.frame()
 for(y in unique(dat$year)){
@@ -102,9 +105,9 @@ for(y in unique(dat$year)){
   w <- which(tmp$lai >= .5)
   don <- tmp$doy[w[1]]
   doff <- tmp$doy[w[length(w)]]
-  tmp <- data.frame(year = y, 
+  tmp <- data.frame(year = y,
                     leaf_on = don,
-                    leaf_off = doff) 
+                    leaf_off = doff)
   lai <- bind_rows(lai, tmp)
 }
 
@@ -130,8 +133,8 @@ hydro <- read_csv('data/watershed/nhcblands_usgs_stats.csv')  %>%
 alldat <- full_join(riparian, nn, by = 'year') %>%
   filter(year !=2020)
 
-ws <- alldat %>% 
-  select(year, agriculture, developed, forested, grass_shrub, 
+ws <- alldat %>%
+  select(year, agriculture, developed, forested, grass_shrub,
          lai_max, NPP_mean, leaf_on_days, leaf_on, leaf_off)
 
 
@@ -154,22 +157,22 @@ summary(lm(cumulative~year, data = cc))
 #   theme_bw()
 # dev.off()
 
-# make multipanel figure ####
+# make multipanel figure (v1) ####
 
-
-tiff("figures/Climate_Watershed_Multipanel_figure.tif", width = 6, height = 5.4, 
-    units = 'in', res = 800, compression = 'lzw')  
-precip_col ='steelblue' 
+dir.create('figures', showWarnings = FALSE)
+tiff("figures/Climate_Watershed_Multipanel_figure.tif", width = 6, height = 5.4,
+    units = 'in', res = 800, compression = 'lzw')
+precip_col ='steelblue'
 dat_col = 'grey25'
 prod_col = 'forestgreen'
 
 m <- cbind(c(1,1,1,1,2,2,3,3,4,4), c(rep(5,6),6,6,7,7))
 layout(m)
 # layout.show(8)
-par(mar = c(1,2,0,1.5), 
-    oma = c(3.5, 2, 4, 0), 
+par(mar = c(1,2,0,1.5),
+    oma = c(3.5, 2, 4, 0),
     adj = 0, ps = 10)
-plot(cc$year, cc$temp_mean, type = 'l', lwd = 1.2, xaxt = 'n', yaxt = 'n', 
+plot(cc$year, cc$temp_mean, type = 'l', lwd = 1.2, xaxt = 'n', yaxt = 'n',
      col = dat_col, ylim = c(8, 17),bty = 'n')
 mtext("Climate Change", 3, 1, cex = 0.9)
 mm <- lm(temp_mean~year, data = cc)
@@ -212,7 +215,7 @@ polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
 text(1970, 220, 'slope = 12 days/decade', col = precip_col, cex = 1)
 rect(1967, 152.5,2020,471,xpd = NA)
 
-# plot(cc$year, cc$cumulative/10^7, type = 'l', lwd = 1.2, col = dat_col, xaxt = 'n', 
+# plot(cc$year, cc$cumulative/10^7, type = 'l', lwd = 1.2, col = dat_col, xaxt = 'n',
 #      yaxt = 'n', bty = 'n', ylim = c(-5, 12))
 # axis(2, at = seq(3, 12, by = 3))
 # mtext('Eno River Discharge', 2, 2.1, cex = .8)
@@ -225,7 +228,7 @@ rect(1967, 152.5,2020,471,xpd = NA)
 axis(1)
 # panel 2 Watershed Change
 par(mar = c(4,2.5,0,1))
-plot(ws$year, ws$forested, ylim = c(0, .90), pch = 19, col = 'forestgreen', 
+plot(ws$year, ws$forested, ylim = c(0, .90), pch = 19, col = 'forestgreen',
      axt = 'n', yaxt = 'n', bty = 'n', xlim = c(1985.5, 2019), xlab = '')
 axis(1)
 mtext("Watershed Change", 3, 1, cex = 0.9)
@@ -253,7 +256,7 @@ rect(1985, -.0355, 2020.2, .937, xpd = NA)
 par(mar = c(2,2.5,0,1))
 
 
-plot(ws$year, ws$NPP_mean, type = 'l', lwd = 1.2, col = 'forestgreen', 
+plot(ws$year, ws$NPP_mean, type = 'l', lwd = 1.2, col = 'forestgreen',
      xlim = c(1985.5, 2019), axes = F)
 mtext("Riparian Area", 3, .2, cex = 0.8)
 mtext('NPP kg/m2/y', 2, 2.1, cex = .8)
@@ -278,5 +281,69 @@ polygon(c(2000:2019, 2019:2000), c(conf_interval$lwr, rev(conf_interval$upr)),
 text(1986, 290, 'leaf off date \nslope = -5 days/decade', col = 'sienna', cex = 1)
 text(1986, 250, 'leaf on date', col = prod_col, cex = 1)
 axis(1)
+
+dev.off()
+
+# make multipanel figure with map (v2) ####
+
+
+dir.create('figures', showWarnings = FALSE)
+png("figures/Climate_Watershed_Multipanel_figure.png", width = 4, height = 5,
+    units = 'in', res = 800, type = 'cairo')
+# tiff("figures/Climate_Watershed_Multipanel_figure.tif", width = 4, height = 5,
+#     units = 'in', res = 800, compression = 'lzw')
+
+precip_col ='steelblue'
+dat_col = 'grey25'
+prod_col = 'forestgreen'
+
+m <- cbind(c(1,1,2,2,3,3,4,4))
+layout(m)
+
+#air
+par(mar = c(1,2,0,1),
+    oma = c(0.5, 2, 0.5, 0),
+    adj = 0, ps = 10)
+plot(cc$year, cc$temp_mean, type = 'l', lwd = 1.2, xaxt = 'n', yaxt = 'n',
+     col = dat_col, ylim = c(13.5, 17),bty = 'n')
+# mtext("Climate Change", 3, 1, cex = 0.9)
+mm <- lm(temp_mean~year, data = cc)
+conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
+lines(1968:2019, conf_interval$fit, col = dat_col)
+polygon(c(1968:2019, 2019:1968), c(conf_interval$lwr, rev(conf_interval$upr)),
+        col = alpha(dat_col, .3), border = NA)
+axis(2, at = 14:17, labels = 14:17)
+lines(cc$year, cc$min_mean, lwd = 1.2, col = dat_col)
+mm <- lm(min_mean~year, data = cc)
+conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
+lines(1968:2019, conf_interval$fit, col = dat_col)
+polygon(c(1968:2019, 2019:1968), c(conf_interval$lwr, rev(conf_interval$upr)),
+        col = alpha(dat_col, .3), border = NA)
+mtext('Air Temp C', 2, 2.1, cex = .8)
+text(1982, 14.2,'Daily mean, slope = 0.4 C/decade', col = dat_col, cex = 1)
+
+#precip
+plot(cc$year, cc$cumulative_precip, type = 'l', lwd = 1.2, col = precip_col, axes = F)
+axis(2, at = c(0.9, 1.3, 1.7))
+mtext('Annual Precip (m)', 2, 2.1, cex = .8)
+plot(cc$year, cc$percent_extreme, type = 'l', lwd = 1.2, col = precip_col, axes = F)
+axis(2, at = c(60, 70, 80), labels = c('60%', '70%', '80%'))
+mtext('% Extreme', 2, 2.1, cex = .8)
+mm <- lm(percent_extreme~year, data = cc)
+conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
+lines(1979:2019, conf_interval$fit, col = precip_col)
+polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
+        col = alpha(precip_col, .3), border = NA)
+text(1970, 75, 'slope = 2.9%/decade', col = precip_col, cex = 1)
+plot(cc$year, cc$zero_days, type = 'l', lwd = 1.2, col = precip_col, axes = F)
+axis(2)#, at = c(60, 70, 80), labels = c('60%', '70%', '80%'))
+mtext('No Precip Days', 2, 2.1, cex = .8)
+mm <- lm(zero_days~year, data = cc)
+conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
+lines(1979:2019, conf_interval$fit, col = precip_col)
+polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
+        col = alpha(precip_col, .3), border = NA)
+text(1970, 220, 'slope = 12 days/decade', col = precip_col, cex = 1)
+rect(1967, 152.5,2020,570,xpd = NA)
 
 dev.off()
