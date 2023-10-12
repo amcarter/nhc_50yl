@@ -1,6 +1,8 @@
 data/*
 !data/hall_data
 !data/gee
+!data/map_files
+!data/watershed_boundary
 .Rhistory
 /figs
 *.tiff
