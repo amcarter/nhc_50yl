@@ -6,3 +6,6 @@ data/*
 *.doc
 model/model_runs
 data_bak
+*.tiff
+map_files_archived/map_files
+*.zip

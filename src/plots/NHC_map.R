@@ -44,52 +44,94 @@ riparian_boundary = study_reaches_line_shortened %>%
 tmap_mode("plot")
 # par(bg=NA)
 
-map_with_colon = tm_shape(watershed_boundary) + tm_polygons(alpha=0, border.col="black", lwd=1) +
-    tm_shape(korstian_div) + tm_polygons(alpha=0.3, col = 'springgreen3',
-                                         border.col="transparent", lwd=.5) +
-    tm_shape(riparian_boundary) + tm_polygons(alpha=0, col="black", lwd=1.5,
-                                              border.col='steelblue3', border.alpha=0.8) +
+# map_with_colon = tm_shape(watershed_boundary) + tm_polygons(alpha=0, border.col="black", lwd=1) +
+#     tm_shape(korstian_div) + tm_polygons(alpha=0.3, col = 'springgreen3',
+#                                          border.col="transparent", lwd=.5) +
+#     tm_shape(riparian_boundary) + tm_polygons(alpha=0, col="black", lwd=1.5,
+#                                               border.col='steelblue3', border.alpha=0.8) +
+#     tm_shape(study_reaches_line_shortened) + tm_lines(col='steelblue3', lwd=2.5) +
+#     tm_shape(stream_line_shortened) + tm_lines(col='black', alpha=0.5, lwd=0.5) +
+#     tm_shape(carter_sites) + tm_symbols(shape=1, col="red2", size=0.6, border.lwd=2) +
+#     tm_shape(hall_sites) + tm_symbols(shape=3, col="black", size=0.6, border.lwd=2) +
+#     tm_scale_bar(text.size = 1, position=c(0, 0)) +
+#     tm_compass(type="arrow", position=c(0.875, 0.05), show.labels=1,
+#                size=3, text.size=1) +
+#     tm_style(style='white') +
+#     tm_layout(frame=TRUE, bg.color="white") +
+#     tm_add_legend(type='symbol', labels = '  Study sites', col = 'red2', size = 0.7,
+#                   shape=1) +
+#     tm_add_legend(type='symbol', labels = '  Hall 1972 sites', col = 'black',
+#                   size=0.5, shape=3, border.lwd=2) +
+#     tm_add_legend(type='line', labels = 'Study reach', col = 'steelblue3', lwd = 2.5) +
+#     tm_add_legend(type='line', labels = 'Riparian zone', col = 'steelblue3', lwd = 1) +
+#     tm_add_legend(type='fill', labels = 'Duke Forest', col = 'springgreen3', alpha=0.3,
+#                   border.col='transparent') +
+#     tm_legend(show=TRUE, position=c('left', 'top'), outside=FALSE, bg.color='gray97',
+#               frame=TRUE, text.size=0.8)
+
+qq = sf::st_bbox(watershed_boundary)
+
+locs <- data.frame(x = qq[c(1,3)], y = qq[c(2,4)]) %>%
+    st_as_sf(coords = c('x', 'y'), crs = 4326)
+
+dem = elevatr::get_elev_raster(locs, z = 12)
+
+## crop and mask
+dem2 <- raster::crop(dem, watershed_boundary)
+dem3 <- raster::mask(dem2, watershed_boundary)
+
+
+qq = sf::st_bbox(watershed_boundary)
+qq[1] = qq[1] - 0.01
+# qq[4] = qq[4] + 0.005
+map_without_colon_legend = tm_shape(watershed_boundary, bbox = qq) +
+    tm_polygons(alpha=0, border.col="black", lwd=1) +
+    tm_shape(dem3) +
+    tm_raster(palette = terrain.colors(20), style = "cont",
+              title = "Elevation (m)")+
+    tm_shape(korstian_div) + tm_polygons(alpha=0.5, col = 'lightblue',
+                                         border.col="grey50", lwd=.5) +
     tm_shape(study_reaches_line_shortened) + tm_lines(col='steelblue3', lwd=2.5) +
     tm_shape(stream_line_shortened) + tm_lines(col='black', alpha=0.5, lwd=0.5) +
-    tm_shape(carter_sites) + tm_symbols(shape=1, col="red2", size=0.6, border.lwd=2) +
-    tm_shape(hall_sites) + tm_symbols(shape=3, col="black", size=0.6, border.lwd=2) +
-    tm_scale_bar(text.size = 1, position="left") +
-    tm_compass(type="arrow", position=c("right", "bottom", show.labels=3),
-               size=5, text.size=1) +
+    tm_shape(carter_sites) + tm_symbols(shape=20, col="red2", size=0.1, border.lwd=1.6) +
+    tm_scale_bar(text.size = 0.6, breaks = c(0, 1, 2, 3),
+                 position=c(0.05, 0)) +
+    tm_compass(type="arrow", position=c("RIGHT", "bottom", show.labels=3),
+               size=1.6, text.size=0.8) +
     tm_style(style='white') +
     tm_layout(frame=TRUE, bg.color="white") +
-    tm_add_legend(type='symbol', labels = '  Study sites', col = 'red2', size = 0.7,
-                  shape=1) +
-    tm_add_legend(type='symbol', labels = '  Hall 1972 sites', col = 'black',
-                  size=0.5, shape=3, border.lwd=2) +
+    tm_add_legend(type='symbol', labels = '  Study sites          ', col = 'red2', #size = 0.4,
+                  shape=20) +
     tm_add_legend(type='line', labels = 'Study reach', col = 'steelblue3', lwd = 2.5) +
-    tm_add_legend(type='line', labels = 'Riparian zone', col = 'steelblue3', lwd = 1) +
-    tm_add_legend(type='fill', labels = 'Duke Forest', col = 'springgreen3', alpha=0.3,
-                  border.col='transparent') +
+    tm_add_legend(type='fill', labels = 'Duke Forest', col = 'lightblue', alpha=0.5,
+                  border.col='grey50') +
     tm_legend(show=TRUE, position=c('left', 'top'), outside=FALSE, bg.color='gray97',
-              frame=TRUE, text.size=1.1)
+              frame=TRUE, text.size=.7)+
+    tm_layout(legend.title.size = 0.8,
+              legend.text.size = 0.7)
 
-map_without_colon = tm_shape(watershed_boundary) + tm_polygons(alpha=0, border.col="black", lwd=1) +
-    tm_shape(korstian_div) + tm_polygons(alpha=0.3, col = 'springgreen3',
-                                         border.col="transparent", lwd=.5) +
+# map_without_colon
+tmap_save(map_without_colon_legend, filename="figs/map_without_colon_legend.tiff",
+          bg="white", dpi = 800, height = 2, width = 3.5, units = 'in')
+map_without_colon = tm_shape(watershed_boundary, bbox = qq) +
+    tm_polygons(alpha=0, border.col="black", lwd=1) +
+    tm_shape(dem3) +
+    tm_raster(palette = terrain.colors(20), style = "cont",
+              title = "Elevation (m)", legend.show = FALSE)+
+    tm_shape(korstian_div) + tm_polygons(alpha=0.5, col = 'lightblue',
+                                         border.col="grey50", lwd=.5) +
     tm_shape(study_reaches_line_shortened) + tm_lines(col='steelblue3', lwd=2.5) +
     tm_shape(stream_line_shortened) + tm_lines(col='black', alpha=0.5, lwd=0.5) +
-    tm_shape(carter_sites) + tm_symbols(shape=1, col="red2", size=0.6, border.lwd=2) +
-    tm_scale_bar(text.size = 1, position="left") +
-    tm_compass(type="arrow", position=c("right", "bottom", show.labels=3),
-               size=5, text.size=1) +
+    tm_shape(carter_sites) + tm_symbols(shape=20, col="red2", size=0.1, border.lwd=1.6) +
+    tm_scale_bar(text.size = 0.6, breaks = c(0, 1, 2, 3),
+                 position=c(0.04, 0)) +
+    tm_compass(type="arrow", position=c("RIGHT", "bottom", show.labels=3),
+               size=1.6, text.size=0.8) +
     tm_style(style='white') +
-    tm_layout(frame=TRUE, bg.color="white") +
-    tm_add_legend(type='symbol', labels = '  Study sites', col = 'red2', size = 0.7,
-                  shape=1) +
-    tm_add_legend(type='line', labels = 'Study reach', col = 'steelblue3', lwd = 2.5) +
-    tm_add_legend(type='fill', labels = 'Duke Forest', col = 'springgreen3', alpha=0.3,
-                  border.col='transparent') +
-    tm_legend(show=TRUE, position=c('left', 'top'), outside=FALSE, bg.color='gray97',
-              frame=TRUE, text.size=1.1)
+    tm_layout(frame=TRUE, bg.color="white")
+# map_without_colon
+tmap_save(map_without_colon, filename="figs/map_without_colon.tiff",
+          bg="white", dpi = 800, height = 2, width = 3.5, units = 'in')
 
-tmap_save(map_without_colon, filename="figs/map_without_colon.png",
-          bg="white", dpi = 300)
-
-tmap_save(map_with_colon, filename="figs/map_with_colon.png",
-          bg="white", dpi = 300)
+# tmap_save(map_with_colon, filename="figs/map_with_colon_3in.tiff",
+#           bg="white", dpi = 800, compression = 'lzw', width = 6, units = 'in')
