@@ -301,7 +301,7 @@ m <- cbind(c(1,1,2,2,3,3,4,4))
 layout(m)
 
 #air
-par(mar = c(1,2,0,1),
+par(mar = c(0,2,0,1),
     oma = c(0.5, 2, 0.5, 0),
     adj = 0, ps = 10)
 plot(cc$year, cc$temp_mean, type = 'l', lwd = 1.2, xaxt = 'n', yaxt = 'n',
@@ -312,23 +312,24 @@ conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
 lines(1968:2019, conf_interval$fit, col = dat_col)
 polygon(c(1968:2019, 2019:1968), c(conf_interval$lwr, rev(conf_interval$upr)),
         col = alpha(dat_col, .3), border = NA)
-axis(2, at = 14:17, labels = 14:17)
+axis(2, at = 14:17, labels = 14:17, las = 2)
 lines(cc$year, cc$min_mean, lwd = 1.2, col = dat_col)
 mm <- lm(min_mean~year, data = cc)
 conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
 lines(1968:2019, conf_interval$fit, col = dat_col)
 polygon(c(1968:2019, 2019:1968), c(conf_interval$lwr, rev(conf_interval$upr)),
         col = alpha(dat_col, .3), border = NA)
-mtext('Air Temp C', 2, 2.1, cex = .8)
+mtext('Air Temp C', 2, 2.7, cex = .8)
 text(1982, 14.2,'Daily mean, slope = 0.4 C/decade', col = dat_col, cex = 1)
 
 #precip
-plot(cc$year, cc$cumulative_precip, type = 'l', lwd = 1.2, col = precip_col, axes = F)
-axis(2, at = c(0.9, 1.3, 1.7))
-mtext('Annual Precip (m)', 2, 2.1, cex = .8)
+plot(cc$year, cc$cumulative_precip, type = 'l', lwd = 1.2, col = precip_col,
+     axes = F, ylim = c(0.9, 1.7), xpd = NA, ylab = '', xlab = '')
+axis(2, at = c(0.9, 1.3, 1.7), las = 2)
+mtext('Annual Precip (m)', 2, 2.7, cex = .8)
 plot(cc$year, cc$percent_extreme, type = 'l', lwd = 1.2, col = precip_col, axes = F)
-axis(2, at = c(60, 70, 80), labels = c('60%', '70%', '80%'))
-mtext('% Extreme', 2, 2.1, cex = .8)
+axis(2, at = c(60, 70, 80), labels = c('60%', '70%', '80%'), las = 2)
+mtext('% Extreme', 2, 2.7, cex = .8)
 mm <- lm(percent_extreme~year, data = cc)
 conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
 lines(1979:2019, conf_interval$fit, col = precip_col)
@@ -336,14 +337,14 @@ polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
         col = alpha(precip_col, .3), border = NA)
 text(1970, 75, 'slope = 2.9%/decade', col = precip_col, cex = 1)
 plot(cc$year, cc$zero_days, type = 'l', lwd = 1.2, col = precip_col, axes = F)
-axis(2)#, at = c(60, 70, 80), labels = c('60%', '70%', '80%'))
-mtext('No Precip Days', 2, 2.1, cex = .8)
+axis(2, las = 2)#, at = c(60, 70, 80), labels = c('60%', '70%', '80%'))
+mtext('No Precip Days', 2, 2.7, cex = .8)
 mm <- lm(zero_days~year, data = cc)
 conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
 lines(1979:2019, conf_interval$fit, col = precip_col)
 polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
         col = alpha(precip_col, .3), border = NA)
 text(1970, 220, 'slope = 12 days/decade', col = precip_col, cex = 1)
-rect(1967, 152.5,2020,570,xpd = NA)
+rect(1967, 152.5,2020,537,xpd = NA)
 
 dev.off()
