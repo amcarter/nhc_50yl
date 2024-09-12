@@ -1,5 +1,10 @@
-
-
+data/*
+!data/hall_data
+!data/gee
+!data/map_files
+!data/watershed_boundary
+.Rhistory
+/figs
 *.doc
 
 #folders to ignore
@@ -7,5 +12,9 @@ model/model_runs
 data/metabolism/modeled
 data/metabolism/processed
 data_bak
-
 .Rproj.user
+*.tiff
+*.tif
+*.png
+map_files_archived/map_files
+*.zip

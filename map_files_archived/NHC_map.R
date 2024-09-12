@@ -6,7 +6,7 @@ library(rgdal)
 library(maps)
 
 setwd('~/git/papers/alice_nhc')
-setwd('C:/Users/alice.carter/git/nhc_50yl/src')
+
 sites <- read.csv("data/map_files/NHCsite_50yl_coordinates.csv",
                   header=TRUE, stringsAsFactors=FALSE)
 

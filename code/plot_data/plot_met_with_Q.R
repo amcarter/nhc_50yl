@@ -1,6 +1,11 @@
 library(pracma)
 library(MetBrewer)
+
+# setwd("C:/Users/Alice Carter/Dropbox (Duke Bio_Ea)/projects/NHC_2019_metabolism")
 # setwd("C:/Users/alice.carter/git/nhc_50yl/src")
+setwd("~/git/papers/alice_nhc")
+# source("src/metabolism/inspect_model_fits.r")
+#source("metabolism/inspect_model_fits.r")
 source("code/metabolism/inspect_model_fits.r")
 
 then_col = "brown3"

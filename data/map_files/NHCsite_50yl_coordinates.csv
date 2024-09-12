@@ -1,0 +1,10 @@
+sitename,sitecode,latitude,longitude,CRS,type
+NewHopeCreek,NHC_8.5,35.9795,-79.0018,WGS84,now
+PineyMountain,NHC_6.9,35.987235,-79.008397,WGS84,now
+ConcreteBridgePool,NHC_5,35.98549,-79.022675,WGS84,now
+WoodenBridge,NHC_2.5,35.993014,-79.034349,WGS84,now
+WoodenBridgePool,NHC_2.3,35.994973,-79.033925,WGS84,now
+UpperNewHopeCreek,NHC_0,35.9925,-79.046,WGS84,now
+ConcreteBridge,6,35.98549,-79.022675,WGS84,hall
+WoodenBridge,4,35.993014,-79.034349,WGS84,hall
+Blackwood,2,35.995272,-79.07363,WGS84,hall
