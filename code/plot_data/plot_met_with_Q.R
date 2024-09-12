@@ -10,7 +10,7 @@ fall_col = "brown3"
 sites <- read_csv("data/siteData/NHCsite_metadata.csv") %>%
     slice(c(1:5,7))
 
-colors = MetBrewer::met.brewer(name="Kandinsky", n=2)
+colors = MetBrewer::met.brewer(name="Kandinsky", n=4)
 
 dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_C.rds")
 
@@ -173,34 +173,90 @@ nhc <- preds_nhc %>%
            GPP_high = case_when(GPP_fill > -ER_fill ~ GPP_fill,
                                 TRUE ~ NA_real_))
 
-color_pal <- c("GPP" = colors[1], "ER" = colors[2])
+color_pal <- c("GPP" = colors[1], "ER" = colors[2],
+               "Net Heterotrophy" = alpha('black', 0.2))
 
     # mutate(date = case_when(year == 2017 ~ date + 365*2,
     #                         year == 2018 ~ date + 365,
     #                         TRUE ~ date)) %>%
 
-met <- ggplot(nhc, aes(doy)) +
+LAI <- read_csv('../data/light/drivers/daily_modeled_light_all_sites.csv') %>%
+    mutate(year = year(date)) %>%
+    filter(site == 'NHC')
+lf <- stats::filter(x =diff(LAI$LAI),
+                    filter = rep(1,3))
+litter <- slice(LAI, -1) %>%
+    mutate(lf = case_when(lf > 0 ~ 0,
+                          TRUE ~ -lf*100),
+           doy = as.numeric(format(date, "%j")),
+           Year = factor(year)) %>%
+    filter(year %in% c(2017, 2018, 2019)) %>%
+    group_by(year) %>%
+    mutate(lf_percent = lf/max(lf),
+           lf_type = case_when(lf_percent >= 0.5 ~ 'max',
+                               lf_percent >= 0.1 ~ 'med',
+                               TRUE ~ NA_character_)) %>%
+    left_join(select(nhc, date, discharge, temp.water))
+
+lsum <- litter %>%
+    group_by(year, lf_type) %>%
+    summarize(start = min(doy),
+              end = max(doy)) %>%
+    filter(!is.na(lf_type)) %>%
+    pivot_longer(cols = c('start', 'end'),
+                 names_to = 'name',
+                 values_to = 'doy') %>%
+    mutate(level = 6)
+
+qsum <- litter %>%
+    filter(lf_type == 'max') %>%
+    ggplot(aes(factor(year), discharge))+
+    geom_boxplot() +
+    theme_classic() +
+    scale_y_log10()+
+    labs(x = '', y = 'Discharge during peak litterfall')
+tsum <- litter %>%
+    filter(lf_type == 'max') %>%
+    ggplot(aes(factor(year), temp.water))+
+    geom_boxplot() +
+    theme_classic() +
+    labs(x = '', y = 'Water temp during peak litterfall')
+sumsum <- ggpubr::ggarrange(qsum, tsum)
+
+met <-
+    ggplot(nhc, aes(doy)) +
     geom_ribbon(aes(ymin = GPP_fill, ymax = -ER_fill),
                 alpha = 0.2, color = NA)+
     geom_ribbon(aes(ymax = GPP_high, ymin = -ER_fill),
                 fill = 'white',color = NA)+
-    geom_line(aes(y = GPP), size = 0.72, col = colors[1]) +
-    geom_line(aes(y = -ER), col = colors[2], size = 0.72) +
-    geom_vline(aes(xintercept = hurricane), lty = 2) +
+    geom_line(aes(y = GPP, col = "GPP"), size = 0.72) +
+    geom_line(aes(y = -ER, col = "ER"), size = 0.72) +
+    geom_segment( aes(x = hurricane, y = 4, xend = hurricane, yend = 2),
+                  arrow = arrow(length = unit(0.12, 'inches')),
+                  linewidth = 1, col = colors[4])+
+    geom_text(aes(x = hurricane, y = 3.5, label = 'Hurricane'),
+              hjust = 0, vjust = 0, nudge_x = 2, col = colors[4])+
     geom_hline(aes(yintercept = 0))+
+    geom_line(data = rename(lsum, Litterfall = lf_type),
+              aes(doy, level, lty = Litterfall),
+              linewidth = 1, col = colors[3])+
     facet_grid(year~., scales = 'free_x')+
     ylim(0, 6.5)+
     labs(x = "Day of year",
          y = "Metabolism (gC/m2/d)",
-         color = "Legend") +
+         color = "Metabolism") +
     theme_classic() +
+    theme(legend.position = 'top',
+          legend.justification = 'left')+
     scale_color_manual(values = color_pal)
 
 
 # plot flow duration curves
 q_dur <- qq %>%
     select(date, discharge = NHC.Q) %>%
-    mutate(year = year(date)) %>%
+    mutate(year = year(date),
+           discharge = case_when(discharge > 100 ~ NA_real_,
+                                 TRUE ~ discharge)) %>%
     filter(year > 2016 & year < 2020)%>%
     arrange(year, discharge) %>%
     mutate(index = NA_real_)
@@ -210,13 +266,34 @@ for(y in unique(q_dur$year)){
     q_dur$index[q_dur$year == y] <- seq(100, 0, length.out = n)
 }
 
+t_dur <- nhc %>%
+    select(date, temp.water) %>%
+    mutate(year = year(date)) %>%
+    filter(year > 2016 & year < 2020)%>%
+    arrange(year, temp.water) %>%
+    mutate(index = NA_real_)
+
+for(y in unique(t_dur$year)){
+    n = nrow(filter(t_dur, year == y))
+    t_dur$index[t_dur$year == y] <- seq(100, 0, length.out = n)
+}
+
+
 fd <- q_dur %>%
     mutate(Year = factor(year))%>%
-ggplot(aes(index, log(discharge))) +
+ggplot(aes(index, discharge)) +
+    geom_line(aes(lty = Year)) +
+    theme_classic() +
+    scale_y_log10()+
+    labs(x = 'Exceedence Frequency',
+         y = 'Discharge (m3/s)')
+td <- t_dur %>%
+    mutate(Year = factor(year))%>%
+ggplot(aes(index, temp.water)) +
     geom_line(aes(lty = Year)) +
     theme_classic() +
     labs(x = 'Exceedence Frequency',
-         y = 'log Discharge (m3/s)')
+         y = 'Water Temparature (C)')
 # fd <-
 wt <- nhc %>%
     mutate(Year = factor(year))%>%
@@ -228,22 +305,24 @@ ggplot(aes(doy, temp.water)) +
 
 
 p2 <- ggpubr::ggarrange(fd, wt, common.legend = TRUE, nrow = 2)
-ggpubr::ggarrange(met, p2)
+p2 <- ggpubr::ggarrange(fd, td, common.legend = TRUE, nrow = 2)
+p3 <- ggpubr::ggarrange(sumsum, p2, heights = c(1,2), nrow = 2, align = 'h')
+
+png(filename = 'figures/NHC_3year_met.png', width = 10, height = 4.5,
+    units = 'in', res = 300)
+    ggpubr::ggarrange(met, p2, widths = c(2,1.2))
+dev.off()
+
+png(filename = 'figures/NHC_qt_during_litterfall.png', width = 6, height = 3,
+    res = 300, units = 'in')
+
+    sumsum
+dev.off()
 
 
 
-
-LAI <- read_csv('data/light/drivers/daily_modeled_light_all_sites.csv') %>%
-    mutate(year = year(date)) %>%
-    filter(site == 'NHC')
-lf <- stats::filter(x =diff(LAI$LAI),
-                    filter = rep(1,3))
-litter <- slice(LAI, -1) %>%
-    mutate(lf = case_when(lf > 0 ~ 0,
-                          TRUE ~ -lf*100),
-           doy = as.numeric(format(date, "%j")),
-           Year = factor(year)) %>%
-    filter(year ==  2018)
+ggplot(litter, aes(doy, lf_percent, group = year))+
+    geom_line()
 
 # get usgs discharge
 library(dataRetrieval)

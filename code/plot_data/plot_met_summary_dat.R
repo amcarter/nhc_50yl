@@ -107,7 +107,7 @@ summary(lm(ER ~ temp.water, data = met))
 summary(lm(GPP ~ temp.water, data = met))
 summary(lm(ER+GPP ~ DO.obs, data = met))
 summary(lm(GPP ~ DO.obs, data = met))
-())
+
 ### Doesn't work below here
 # met_dat %>%
 #   filter(site %in% c('NHC', 'UNHC')) %>%

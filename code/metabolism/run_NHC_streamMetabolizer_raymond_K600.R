@@ -1,6 +1,5 @@
 ## Model Metabolism #
-# adapted from JRB script
-# This version runs metabolism on NHC sites using the K600 values from Hall 1972
+# This version runs metabolism on NHC and UNHC sites using raymond K600 values as priors
 
 # update.packages(oldPkgs=c("streamMetabolizer","unitted"), dependencies=TRUE,
 #                 repos=c("http://owi.usgs.gov/R", "https://cran.rstudio.com"))
@@ -11,14 +10,14 @@ library(streamMetabolizer)
 library(lubridate)
 library(dygraphs)
 
-setwd("C:/Users/alice.carter/git/nhc_50yl/src/data")
+setwd("C:/Users/alice.carter/git/nhc_50yl/src/")
 # setwd("~Desktop/donkey")
 ## Read in Data ####
-sites <- read_csv("data/NHCsite_metadata.csv")
+sites <- read_csv("data/siteData/NHCsite_metadata.csv")
 
 # select variables for metabolism
 
-dat <- read_csv('data/NHC_UNHC.csv', guess_max = 100000) %>%
+dat <- read_csv('data/metabolism/processed/NHC_UNHC.csv', guess_max = 100000) %>%
     filter(solar.time > ymd_hms('2016-12-29 00:00:00'))
 NHC <- filter(dat, site == "NHC") %>% select(-site)
 UNHC <- filter(dat, site == "UNHC")%>% select(-site)
@@ -74,11 +73,10 @@ set_up_model <- function(dat, bayes_name, site, one = T,
     delta <- (Qrng[2]-Qrng[1])/n
   }
   nodes <- seq(Qrng[1], Qrng[2], length = n)
-  ## Based on Pete Raymond's data
+  ## Based on Pete Raymond's paper
   slope <- sites[sites$sitecode==site, ]$slope_nhd
-  # from bob
   # from Joanna's paper
-  if(one == T){
+  if(one == T){ # should there be a single value for dishcarge nodes, or multiple?
     lnK600 <- 4.77+0.55*log(slope)+(-0.52*(log(median(dat$depth, na.rm = T))))
     # lnK600 <- 6.59 + 0.72 * log(slope) - 0.065* log(median(daily$discharge, na.rm = T))
     bayes_specs$K600_lnQ_nodes_meanlog <- c(rep(lnK600, n))
@@ -100,14 +98,14 @@ set_up_model <- function(dat, bayes_name, site, one = T,
 
 # Model Run ####
 # NHC
-bayes_specs <- set_up_model(NHC, bayes_name, "NHC", one = F,
+bayes_specs <- set_up_model(dat = NHC, bayes_name, site = "NHC", one = F,
                             burnin_steps = 1000, saved_steps = 1000)
 fit <- metab(bayes_specs, NHC)
 saveRDS(fit, "fit_nhc_uninformed_raymond_K.rds")
 
 
 # UNHC
-bayes_specs <- set_up_model(UNHC, bayes_name, "UNHC", one = F,
+bayes_specs <- set_up_model(dat = UNHC, bayes_name, site = "UNHC", one = F,
                             burnin_steps = 1000, saved_steps = 1000)
 fit <- metab(bayes_specs, UNHC)
 saveRDS(fit, "fit_unhc_uninformed_raymond_K.rds")

@@ -1,6 +1,11 @@
 
 
 *.doc
+
+#folders to ignore
 model/model_runs
+data/metabolism/modeled
+data/metabolism/processed
 data_bak
 
+.Rproj.user
