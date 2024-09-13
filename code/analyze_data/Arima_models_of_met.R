@@ -90,7 +90,8 @@ hall_scaled <- hall_preds %>%
 # fit the model using an AR1 from the forecast package:
 for_mod <- forecast::Arima(y = log(P_scaled$GPP),
                            order = c(1,0,0),
-                           xreg = matrix(c(P_scaled$temp.water, P_scaled$light,
+                           xreg = matrix(c(P_scaled$temp.water,
+                                           P_scaled$light,
                                            P_scaled$CBP),
                                          nrow = nrow(P_scaled), ncol = 3))
 
@@ -182,8 +183,8 @@ tiff('figures/Arima_hindcast_comparison_daily.tiff', width = 7.5, height = 4,
     #     theme_bw()+
     #     theme(axis.title.x = element_blank())
     ggplot() +
-        geom_line(data = hall_scaled, aes(x = date, y = ER, color = "Arima Hindcast")) +
-        geom_line(data = hall_scaled, aes(x = date, y = GPP, color = "Arima Hindcast")) +
+        geom_line(data = hall_scaled, aes(x = date, y = ER, color = "AR1 Hindcast")) +
+        geom_line(data = hall_scaled, aes(x = date, y = GPP, color = "AR1 Hindcast")) +
         geom_point(data = hall, aes(x = date, y = ER, color = "Historical Data")) +
         geom_point(data = hall, aes(x = date, y = GPP, color = "Historical Data")) +
         geom_hline(yintercept = 0) +
@@ -192,7 +193,7 @@ tiff('figures/Arima_hindcast_comparison_daily.tiff', width = 7.5, height = 4,
         theme_bw() +
         # Custom legend
         scale_color_manual(
-            values = c("Arima Hindcast" = "black", "Historical Data" = "brown3")
+            values = c("AR1 Hindcast" = "black", "Historical Data" = "brown3")
         ) +
         guides(color = guide_legend(override.aes = list(shape = c(NA, 16), linetype = c(1, 0)))) +
         theme(
@@ -239,15 +240,15 @@ tiff('figures/Arima_hindcast_comparison_monthly.tiff', width = 7.5, height = 4,
 ggplot(hall_pred_sum, aes(month, GPP_mean)) +
     # Ribbons for GPP and ER with grey fill (Arima Hindcast)
     geom_ribbon(aes(ymin = GPP_mean - GPP_sd,
-                    ymax = GPP_mean + GPP_sd, fill = "Arima Hindcast"),
+                    ymax = GPP_mean + GPP_sd, fill = "AR1 Hindcast"),
                 col = NA, fill = 'grey') +
     geom_ribbon(aes(ymin = ER_mean - ER_sd,
-                    ymax = ER_mean + ER_sd, fill = "Arima Hindcast"),
+                    ymax = ER_mean + ER_sd, fill = "AR1 Hindcast"),
                 col = NA, fill = 'grey') +
 
     # Lines for GPP and ER predictions (black, Arima Hindcast)
-    geom_line(aes(y = GPP_mean, color = "Arima Hindcast")) +
-    geom_line(aes(y = ER_mean, color = "Arima Hindcast")) +
+    geom_line(aes(y = GPP_mean, color = "AR1 Hindcast")) +
+    geom_line(aes(y = ER_mean, color = "AR1 Hindcast")) +
 
     # Horizontal line at y = 0
     geom_hline(yintercept = 0) +
@@ -267,13 +268,13 @@ ggplot(hall_pred_sum, aes(month, GPP_mean)) +
     # Custom legend
     scale_color_manual(
         name = "Legend",
-        values = c("Arima Hindcast" = "black", "Historical Data" = "brown3"),
-        labels = c("Arima Hindcast", "Historical Data")
+        values = c("AR1 Hindcast" = "black", "Historical Data" = "brown3"),
+        labels = c("AR1 Hindcast", "Historical Data")
     ) +
     scale_fill_manual(
         name = "Legend",
-        values = c("Arima Hindcast" = "grey"),
-        labels = c("Arima Hindcast")
+        values = c("AR1 Hindcast" = "grey"),
+        labels = c("AR1 Hindcast")
     ) +
     scale_x_continuous(
         breaks = 1:12, # Assuming months are represented as 1-12
@@ -292,6 +293,294 @@ ggplot(hall_pred_sum, aes(month, GPP_mean)) +
         legend.title = element_blank()
     )
 dev.off()
+
+
+################################################################################
+
+# try with brms (also old code):
+# regenrate the prediction data frame:
+
+hall_scaled <- hall_preds %>%
+    mutate(log_Q = (log_Q - scaling_pars$log_Q_mean)/scaling_pars$log_Q_sd,
+           light = (light - scaling_pars$light_mean)/scaling_pars$light_sd,
+           temp.water = (temp.water - scaling_pars$temp.water_mean)/scaling_pars$temp.water_sd)
+
+P_scaled <- P_scaled %>%
+    mutate(log_GPP = log(GPP),
+           log_ER = log(ER))
+
+bform_GPP <- bf(log_GPP | mi() ~ ar(p = 1) + (1|site) + temp.water + light)
+get_prior(bform_GPP, data = P_scaled)
+GPP_priors <- c(prior("normal(0,5)", class = "b"),
+                prior("beta(1,1)", class = "ar", lb = 0, ub = 1),
+                prior("normal(0,5)", class = "Intercept"),
+                prior("cauchy(0,1)", class = "sigma"))
+
+bmod_GPP <- brm(bform_GPP,
+                data = P_scaled,
+                chains = 4, cores = 4, iter = 2000,
+                prior = GPP_priors,
+                control = list(adapt_delta = 0.99,
+                               max_treedepth = 12) )
+
+
+draws_fit <- as_draws_array(bmod_GPP)
+GPP_pars <- posterior::summarize_draws(draws_fit) %>%
+    filter(variable %in%  c('b_Intercept', 'b_temp.water', 'b_light',
+                            'ar[1]', 'sigma', 'r_site[CBP,Intercept]',
+                            'r_site[NHC,Intercept]', 'sd_site__Intercept')) %>%
+    mutate(model = 'GPP')
+str(draws_fit)
+
+pd <- posterior::subset_draws(draws_fit,
+                        variable = c('b_Intercept', 'b_temp.water', 'b_light',
+                                     'ar[1]', 'sigma', 'r_site[CBP,Intercept]',
+                                     'r_site[NHC,Intercept]'),
+                        draw = 1:2000)
+post <- data.frame(matrix(pd, nrow = 2000, byrow = FALSE))
+colnames(post) <- c('intercept', 'b_temp.water', 'b_light', 'phi', 'sigma',
+                  'cbp_intercept', 'nhc_intercept')
+
+# matrix of draws from the posterior-predictive distribution
+draws <- nrow(post)
+post_preds <- matrix(nrow = draws, ncol = nrow(hall_scaled))
+
+# fill in first observation based on the mean from the measured historical values at the site
+post_preds[, 1] <- matrix(
+    rep(log(mean(hall$GPP, na.rm = T) + epsilon), each = draws),
+    nrow = draws, ncol = 1
+)
+
+for(i in 1:draws){
+    for(t in 2:nrow(hall_scaled)){
+        post_preds[i, t] <- (1 - post$phi[i]) * (post$intercept[i] + post$cbp_intercept[i]) +
+            post$b_light[i] * hall_scaled$light[t] +
+            post$b_temp.water[i] * hall_scaled$temp.water[t] +
+            post$phi[i] * post_preds[i, t-1] -
+            post$phi[i] * (post$b_light[i] * hall_scaled$light[t-1] +
+            post$b_temp.water[i] * hall_scaled$temp.water[t-1])#+ rnorm(1, sd = sigma_post[i])
+    }
+}
+
+hindcast_GPP <- data.frame(
+    date = hall_scaled$date,
+    GPP_pred = apply(post_preds, 2, mean),
+    GPP_low = apply(post_preds, 2, quantile, probs = 0.025),
+    GPP_high = apply(post_preds, 2, quantile, probs = 0.975)
+) %>%
+    mutate(GPP = exp(GPP_pred) - epsilon,
+           GPP_low = exp(GPP_low)- epsilon,
+           GPP_high = exp(GPP_high - epsilon))
+
+ggplot(hindcast_GPP, aes(date, GPP), col = 2) +
+    geom_ribbon(aes(ymin = GPP_low, ymax = GPP_high),
+                col = NA, fill = 'grey') +
+    geom_line() +
+    geom_point(data = hall,  col = 2)
+
+
+# model for ER
+
+bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water + light + log_Q)
+get_prior(bform_ER, data = P_scaled)
+ER_priors <- c(prior("normal(0,5)", class = "b"),
+               prior("normal(0,5)", class = "Intercept"),
+               prior("cauchy(0,1)", class = "sigma"),
+               prior("beta(1,1)", class = "ar", lb = 0, ub = 1))
+bmod_ER <- brm(bform_ER,
+               data = P_scaled,
+               prior = ER_priors,
+               chains = 4, cores = 4, iter = 2000,
+               control = list(adapt_delta = 0.99,
+                              max_treedepth = 12))
+
+summary(bmod_ER)
+draws_fit_ER <- as_draws_array(bmod_ER)
+ER_pars <- posterior::summarize_draws(draws_fit_ER) %>%
+    filter(variable %in% c('b_Intercept', 'b_temp.water', 'b_light',
+                           'b_log_Q', 'ar[1]', 'sigma',
+                           'r_site[CBP,Intercept]', 'r_site[NHC,Intercept]',
+                           'sd_site__Intercept') ) %>%
+    mutate(model = "ER")
+
+pd <- posterior::subset_draws(draws_fit_ER,
+                              variable = c('b_Intercept', 'b_temp.water', 'b_light',
+                                           'b_log_Q', 'ar[1]', 'sigma',
+                                           'r_site[CBP,Intercept]',
+                                           'r_site[NHC,Intercept]'),
+                              draw = 1:2000)
+post <- data.frame(matrix(pd, nrow = 2000, byrow = FALSE))
+colnames(post) <- c('intercept', 'b_temp.water', 'b_light', 'b_logQ', 'phi',
+                    'sigma', 'cbp_intercept', 'nhc_intercept')
+
+# matrix of draws from the posterior-predictive distribution
+draws <- nrow(post)
+post_preds_ER <- matrix(nrow = draws, ncol = nrow(hall_scaled))
+
+# fill in first observation based on the mean from the measured historical values at the site
+post_preds_ER[, 1] <- matrix(
+    rep(log(mean(-hall$ER, na.rm = T) + epsilon), each = draws),
+    nrow = draws, ncol = 1
+)
+
+
+for(i in 1:draws){
+    for(t in 2:nrow(hall_scaled)){
+        post_preds_ER[i, t] <- (1 - post$phi[i]) * (post$intercept[i] + post$cbp_intercept[i]) +
+            post$b_light[i] * hall_scaled$light[t] +
+            post$b_temp.water[i] * hall_scaled$temp.water[t] +
+            post$b_logQ[i] * hall_scaled$log_Q[t] +
+            post$phi[i] * post_preds_ER[i, t-1] -
+            post$phi[i] * (post$b_light[i] * hall_scaled$light[t-1] +
+                               post$b_temp.water[i] * hall_scaled$temp.water[t-1] +
+                               post$b_logQ[i] * hall_scaled$log_Q[t-1])
+    }
+}
+
+hindcast_ER <- data.frame(
+    date = hall_scaled$date,
+    ER_pred = apply(post_preds_ER, 2, mean),
+    ER_low = apply(post_preds_ER, 2, quantile, probs = 0.025),
+    ER_high = apply(post_preds_ER, 2, quantile, probs = 0.975)
+) %>%
+    mutate(ER = -exp(ER_pred) + epsilon,
+           ER_low = -exp(ER_low) + epsilon,
+           ER_high = -exp(ER_high + epsilon))
+
+ggplot(hindcast_ER, aes(date, ER), col = 2) +
+    geom_ribbon(aes(ymin = ER_low, ymax = ER_high),
+                col = NA, fill = 'grey') +
+    geom_line() +
+    geom_point(data = hall,  col = 2)
+
+hindcast <- full_join(hindcast_GPP, hindcast_ER, by = 'date')
+
+hindcast <- hall %>%
+    select(date, GPP_measured = GPP, ER_measured = ER) %>%
+    group_by(date) %>%
+    summarize(across(c('GPP_measured', 'ER_measured'), mean)) %>%
+    right_join(hindcast, by = 'date')
+
+bind_rows(GPP_pars, ER_pars) %>%
+    write_csv('data/BRMS_hindcast_models_coefficients.csv')
+
+################################################################################
+# Make Figures:
+
+tiff('figures/BRMS_hindcast_comparison_daily.tiff', width = 7.5, height = 4,
+     units = 'in', res = 300)
+
+ggplot(hindcast) +
+    geom_ribbon(aes(x = date, ymin = ER_high, ymax = ER_low),
+                col = NA, fill = 'grey') +
+    geom_ribbon(aes(x = date, ymin = GPP_low, ymax = GPP_high),
+                col = NA, fill = 'grey') +
+    geom_line(aes(x = date, y = ER, color = "AR1 Hindcast")) +
+    geom_line(aes(x = date, y = GPP, color = "AR1 Hindcast")) +
+    geom_point(aes(x = date, y = ER_measured, color = "Historical Data")) +
+    geom_point(aes(x = date, y = GPP_measured, color = "Historical Data")) +
+    geom_hline(yintercept = 0) +
+    ylab(expression(paste('Metabolism (g ', O[2], m^-2, d^-1, ')'))) +
+    xlab('Date')+
+    theme_bw() +
+    # Custom legend
+    scale_color_manual(
+        values = c("AR1 Hindcast" = "black", "Historical Data" = "brown3")
+    ) +
+    guides(color = guide_legend(override.aes = list(shape = c(NA, 16), linetype = c(1, 0)))) +
+    theme(
+        legend.position = c(0.02, 0.97), # Upper-left inside the plot
+        legend.justification = c(0, 1),
+        legend.title = element_blank(),
+    )
+dev.off()
+
+
+# compare the predictions averaged across months like in Hall 1972
+hall_pred_sum <- hindcast %>%
+    mutate(month = month(date)) %>%
+    group_by(month) %>%
+    summarize(across(starts_with(c('GPP','ER')),
+                     .fns = c(mean = \(x) mean(x, na.rm = T),
+                              sd = \(x) sd(x, na.rm = T)))) %>%
+    ungroup()
+hall_sum <- hall %>%
+    mutate(month = month(date)) %>%
+    group_by(month) %>%
+    summarize(across(c('GPP','ER'),
+                     .fns = c(mean = \(x) mean(x, na.rm = T),
+                              sd = \(x) sd(x, na.rm = T)))) %>%
+    ungroup()
+
+tiff('figures/BRMS_hindcast_comparison_monthly.tiff', width = 7.5, height = 4,
+     units = 'in', res = 300)
+
+
+ggplot(hall_pred_sum, aes(month, GPP_mean)) +
+    # Ribbons for GPP and ER with grey fill (Arima Hindcast)
+    geom_ribbon(aes(ymin = GPP_mean - GPP_sd,
+                    ymax = GPP_mean + GPP_sd, fill = "AR1 Hindcast"),
+                col = NA, fill = 'grey') +
+    geom_ribbon(aes(ymin = ER_mean - ER_sd,
+                    ymax = ER_mean + ER_sd, fill = "AR1 Hindcast"),
+                col = NA, fill = 'grey') +
+
+    # Lines for GPP and ER predictions (black, Arima Hindcast)
+    geom_line(aes(y = GPP_mean, color = "AR1 Hindcast")) +
+    geom_line(aes(y = ER_mean, color = "AR1 Hindcast")) +
+    geom_hline(yintercept = 0) +
+
+    # Lines and error bars for actual data (red, Historical Data)
+    geom_line(data = hall_sum, aes(y = GPP_mean, color = "Historical Data")) +
+    geom_errorbar(data = hall_sum, aes(ymin = GPP_mean - GPP_sd,
+                                       ymax = GPP_mean + GPP_sd, color = "Historical Data"),
+                  width = 0.2) +
+    geom_line(data = hall_sum, aes(y = ER_mean, color = "Historical Data")) +
+    geom_errorbar(data = hall_sum, aes(ymin = ER_mean - ER_sd,
+                                       ymax = ER_mean + ER_sd, color = "Historical Data"),
+                  width = 0.2) +
+    ylab(expression(paste('Metabolism (g ', O[2], m^-2, d^-1, ')'))) +
+    xlab('')+
+
+    # Custom legend
+    scale_color_manual(
+        name = "Legend",
+        values = c("AR1 Hindcast" = "black", "Historical Data" = "brown3"),
+        labels = c("AR1 Hindcast", "Historical Data")
+    ) +
+    scale_fill_manual(
+        name = "Legend",
+        values = c("AR1 Hindcast" = "grey"),
+        labels = c("AR1 Hindcast")
+    ) +
+    scale_x_continuous(
+        breaks = 1:12, # Assuming months are represented as 1-12
+        labels = month.abb
+    ) +
+    # Adjust the legend to show color, linetype, and points
+    guides(
+        color = guide_legend(override.aes = list(linetype = c(1, 1), shape = NA)),
+        fill = guide_legend(override.aes = list(linetype = 0))
+    ) +
+
+    # Apply theme adjustments
+    theme_bw() +
+    theme(
+        legend.position = c(0.88, 0.88), # Adjust as needed for legend position
+        legend.title = element_blank()
+    )
+dev.off()
+ER_pred <- predict(bmod_ER, newdata = hall_preds)
+hall_preds <- cbind(hall_preds, ER_pred) %>%
+    rename(ER = Estimate,
+           ER_err = Est.Error,
+           ER_Q2.5 = Q2.5,
+           ER_Q97.5 = Q97.5)
+
+ggplot(hall_preds, aes(date, GPP)) +
+    geom_point() +
+    geom_point(aes(y = ER), col = 2)
+
 ################################################################################
 # Attempt to model using GAMS:(old code)
 # Fit the model with Gamma distribution and random effects
@@ -362,7 +651,7 @@ ggplot(P_scaled, aes(x = date, y = -ER)) +
 
 
 ER_preds <-  predict(model_mgcv_ER, newdata = hall_scaled,
-                      type = 'response', se.fit = TRUE)
+                     type = 'response', se.fit = TRUE)
 hall_scaled$ER_pred <- ER_preds$fit
 hall_scaled$ER_se <- ER_preds$se.fit
 hall_scaled$ER <- -hall_scaled$ER_pred + epsilon
@@ -374,68 +663,3 @@ ggplot(hall_scaled, aes(date, ER))+
     geom_point() +
     geom_line() +
     geom_point(data = hall, col = 2)
-
-
-
-
-# try with brms (also old code):
-# regenrate the prediction data frame:
-
-hall_scaled <- hall_preds %>%
-    mutate(log_Q = (log_Q - scaling_pars$log_Q_mean)/scaling_pars$log_Q_sd,
-           light = (light - scaling_pars$light_mean)/scaling_pars$light_sd,
-           temp.water = (temp.water - scaling_pars$temp.water_mean)/scaling_pars$temp.water_sd)
-
-
-# AR1 model with site as a random effect
-# determine the parameters for a gamma prior on GPP
-a = mean(P_scaled$GPP, na.rm = T)^2/sd(P_scaled$GPP, na.rm = T)
-b = mean(P_scaled$GPP, na.rm = T)/sd(P_scaled$GPP, na.rm = T)
-
-bform_GPP <- bf(GPP | mi() ~ ar(p = 1, cov = TRUE) + (1|site) + temp.water + light)
-get_prior(bform_GPP, data = P_scaled, family = Gamma(link = 'log'))
-GPP_priors <- c(prior("normal(0,5)", class = "b"),
-                prior("gamma(1, 1)", class = "shape"))
-
-bmod_GPP <- brm(bform_GPP,
-                data = P_scaled,
-                family = Gamma(link = "log"),
-                chains = 4, cores = 4, iter = 1000,
-                prior = GPP_priors,
-                control = list(adapt_delta = 0.99) )
-
-summary(bmod_GPP)
-
-
-GPP_pred <- predict(bmod_GPP, newdata = hall_scaled)
-hall_scaled <- cbind(hall_scaled, GPP_pred) %>%
-    rename(GPP = Estimate,
-           GPP_err = Est.Error,
-           GPP_Q2.5 = Q2.5,
-           GPP_Q97.5 = Q97.5)
-ggplot(hall_preds, aes(date, GPP)) +
-    geom_point() + geom_line() +
-    geom_ribbon(aes(ymin = GPP_Q2.5,
-                    ymax = GPP_Q97.5), fill = 'grey', col = NA)+
-    geom_point(data = hall)
-
-bmod_ER <- brm(ER ~ ar(p = 1, gr = site) + (1|site) +
-                log_Q * temp.water + GPP,
-               data = P_scaled,
-               family = Gamma(link = "log"),
-               prior = set_prior("normal(0,5)", class = "b"),
-               chains = 4, cores = 4, iter = 1000)
-
-summary(bmod_ER)
-
-ER_pred <- predict(bmod_ER, newdata = hall_preds)
-hall_preds <- cbind(hall_preds, ER_pred) %>%
-    rename(ER = Estimate,
-           ER_err = Est.Error,
-           ER_Q2.5 = Q2.5,
-           ER_Q97.5 = Q97.5)
-
-ggplot(hall_preds, aes(date, GPP)) +
-    geom_point() +
-    geom_point(aes(y = ER), col = 2)
-
