@@ -467,7 +467,9 @@ bind_rows(GPP_pars, ER_pars) %>%
 ################################################################################
 # Make Figures:
 
-tiff('figures/BRMS_hindcast_comparison_daily.tiff', width = 7.5, height = 4,
+# tiff('figures/BRMS_hindcast_comparison_daily.tiff', width = 7.5, height = 4,
+#      units = 'in', res = 300)
+png('figures/BRMS_hindcast_comparison_daily.png', width = 7.5, height = 4,
      units = 'in', res = 300)
 
 ggplot(hindcast) +
@@ -512,7 +514,9 @@ hall_sum <- hall %>%
                               sd = \(x) sd(x, na.rm = T)))) %>%
     ungroup()
 
-tiff('figures/BRMS_hindcast_comparison_monthly.tiff', width = 7.5, height = 4,
+# tiff('figures/BRMS_hindcast_comparison_monthly.tiff', width = 7.5, height = 4,
+#      units = 'in', res = 300)
+png('figures/BRMS_hindcast_comparison_monthly.png', width = 7.5, height = 4,
      units = 'in', res = 300)
 
 

@@ -1,14 +1,16 @@
-data/*
+
 !data/hall_data
 !data/gee
 !data/map_files
 !data/watershed_boundary
 .Rhistory
-/figs
+/figures
 *.doc
+.Rproj.user
 
 #folders to ignore
 model/model_runs
+data/metabolism/raw
 data/metabolism/modeled
 data/metabolism/processed
 data_bak
@@ -18,3 +20,5 @@ data_bak
 *.png
 map_files_archived/map_files
 *.zip
+
+code/analyze_data/*.rds
