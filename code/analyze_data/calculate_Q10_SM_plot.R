@@ -1,8 +1,24 @@
 # calculate Q10 for NHC sites from SM metabolism estimates
-dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_C.rds")
+
+source('code/helpers.R')
+library(tidyverse)
+
+sites <- read_csv("data/siteData/NHCsite_metadata.csv") %>%
+    slice(c(1:5,7))
+
+dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_O2.rds")
+d2 <- read_csv("data/metabolism/compiled/metabolism_and_drivers.csv")
+
+then_col = "brown3"
+now_col = "gray"
+fall_col = "brown3"
+
 
 met <- dat$preds %>%
   mutate(NEP = -(GPP + ER))
+met <- left_join(met,
+                 select(d2, date, site, LAI, PAR_surface),
+                 by = c('date', 'site'))
 
 calc_q10 <- function(met) {
   if(!("r1" %in% colnames(met))){
@@ -130,8 +146,10 @@ nhcs <-  nhc %>%
   mutate(period = "Summer (Jun-Aug)") %>%
   bind_rows(nhcf)
 
-nhc_seasons <- dat$preds %>%
-  filter(site %in% c('NHC', 'UNHC'), year !=2020) %>%
+nhc_seasons <- met %>%
+    left_join(select(d2, date, site, LAI, PAR_surface),
+              by = c('date', 'site')) %>%
+  filter(site %in% c('NHC'), year !=2020) %>%
   mutate(NEP = -(GPP + ER),
          season = factor(case_when(month %in% c(1,2,12) ~ "Winter (Dec-Feb)",
                                    month %in% c(3:5) ~ "Spring (Mar-May)",
@@ -140,19 +158,49 @@ nhc_seasons <- dat$preds %>%
                          levels = c("Spring (Mar-May)", "Summer (Jun-Aug)",
                                     "Fall (Sep-Nov)", "Winter (Dec-Feb)")))
 
-tiff(filename = 'figures/NEP_seasonal_temp.tif', compression = 'lzw',
-     height = 3.4 * 800, width = 9 * 800, units = 'px', res = 800)
-# png("figures/NEP_seasonal_temp.png", width = 9, height = 3.4,
-#     res = 300, units = 'in')
-ggplot(nhc_seasons, aes(temp.water, NEP, col = season, shape = site)) +
+png(filename = 'figures/ER_seasonal_rel.png',
+     height = 7.5, width = 9, units = 'in', res = 300)
+nhc_seasons %>%
+    mutate(discharge = log(discharge)) %>%
+    select(date, site, year, season, GPP, ER, NEP,
+           discharge, temperature = temp.water, LAI, light = PAR_surface) %>%
+pivot_longer(cols = c('discharge', 'temperature', 'light'),
+             names_to = 'covariate', values_to = 'value') %>%
+
+ggplot( aes(value, ER, col = season)) +
   geom_point(size = 1.2) +
-  facet_wrap(.~year) +
+  facet_grid(year~covariate, scales = 'free') +
   scale_shape_manual(values = c(19,21)) +
-  xlab('Water Temperature C')+
-  # scale_color_manual(values = c(1,1,then_col,1)) +
-  # geom_smooth(method = lm, se =F) +
-  theme_bw()
+  xlab(expression(paste('Discharge (', m^3, s^-1, ")                         PAR (", mu, "mol", s^-1, ")                        Temperature (", degree, "C)")))+
+  theme_bw()+
+  theme(
+        strip.background.x = element_blank(),         # Remove strip background
+        strip.text.x = element_blank()             # Remove x-axis facet labels
+    )
+
 dev.off()
+png(filename = 'figures/GPP_seasonal_rel.png',
+     height = 7.5, width = 9, units = 'in', res = 300)
+nhc_seasons %>%
+    mutate(discharge = log(discharge)) %>%
+    select(date, site, year, season, GPP, ER, NEP,
+           discharge, temperature = temp.water, LAI, light = PAR_surface) %>%
+pivot_longer(cols = c('discharge', 'temperature', 'light'),
+             names_to = 'covariate', values_to = 'value') %>%
+
+ggplot( aes(value, GPP, col = season)) +
+  geom_point(size = 1.2) +
+  facet_grid(year~covariate, scales = 'free') +
+  scale_shape_manual(values = c(19,21)) +
+  xlab(expression(paste('Discharge (', m^3, s^-1, ")                         PAR (", mu, "mol", s^-1, ")                        Temperature (", degree, "C)")))+
+  theme_bw()+
+  theme(
+        strip.background.x = element_blank(),         # Remove strip background
+        strip.text.x = element_blank()             # Remove x-axis facet labels
+    )
+
+dev.off()
+
 # ggplot(nhc_seasons, aes(log(discharge), NEP, col = season)) +
 #   geom_point(size = 2) +
 #   facet_wrap(.~year) +
@@ -178,37 +226,49 @@ nhc_fall1 <- nhc_fall %>%
 ann = data.frame()
 for(y in 2017:2019){
   m <- summary(lm(NEP ~ temp.water, data = nhc_fall1[nhc_fall1$year == y,]))
-    r = round(m$r.squared, 2)
-    p = round(m$coefficients[2,4],2)
+    rsqf = round(m$r.squared, 2)
+    # p = round(m$coefficients[2,4],2)
     sf = round(m$coefficients[2,1],2)
-    mf = paste0("r2 = ", r, ",  p =  ", p)
-    # mf = paste0("slope = ",s, ", r2 = ", r, ",  p =  ", p)
+    # mf = paste0("r2 = ", rsq, ",  p =  ", p)
+    mf = paste0("slope = ",sf, ", r2 = ", rsqf)
   m <- summary(lm(NEP ~ temp.water, data = nhc_fall[nhc_fall$year == y,]))
-    r = round(m$r.squared, 2)
-    p = round(m$coefficients[2,4],2)
+    rsqy = round(m$r.squared, 2)
+    # p = round(m$coefficients[2,4],2)
     sy = round(m$coefficients[2,1],2)
-    my = paste0("r2 = ", r, ",  p =  ", p)
-    # my = paste0("slope = ",s, ", r2 = ", r, ",  p =  ", p)
+    # my = paste0("r2 = ", rsq, ",  p =  ", p)
+    my = paste0("slope = ", sy, ", r2 = ", rsqy)
     ann = bind_rows(ann, data.frame(year = y, mf = mf, my = my,
-                                    sf = sf, sy = sy))
+                                    sf = sf, sy = sy,
+                                    rsqf = rsqf, rsqy = rsqy))
 }
+
+ann$label_mf <- with(ann, sapply(1:nrow(ann), function(i) {
+    bquote(beta == .(ann$sf[i]) ~ "," ~ R^2 == .(ann$rsqf[i]))
+}))
+ann$label_my <- with(ann, sapply(1:nrow(ann), function(i) {
+    bquote(beta == .(ann$sy[i]) ~ "," ~ R^2 == .(ann$rsqy[i]))
+}))
+
+# ann$label_mf <- with(ann, paste(expression(beta), " = ", ann$sf, ", ", expression(r^2), " = ", ann$rsqf))
 ann_full <- ann %>%
   mutate(var = 'temp', site = length(ss)) %>%
   bind_rows(ann_full)
 # png("figures/NEP_drivers_temp.png", width = 9, height = 3.65,
 #     res = 300, units = 'in')
 tt <- ggplot(nhc_fall, aes(temp.water, NEP), col = 1) +
-  geom_point(size = 2) +
+  geom_point(size = 1.2) +
   facet_wrap(.~year) +
   geom_smooth(method = lm, se = F, col = 1) +
-  geom_point(data = nhc_fall1, col = fall_col, size = 2) +
+  geom_point(data = nhc_fall1, col = fall_col, size = 1.2) +
   geom_smooth(data = nhc_fall1, method = lm, se =F, col = fall_col) +
   theme_bw() +
-  geom_text(data = ann, x = 3, y = 5.4, aes(label = mf),
+  geom_text(data = ann, x = 1.5, y = 14,
+            aes(label = label_mf), parse = TRUE,
             col = fall_col, hjust = 0) +
-  geom_text(data = ann, x = 3, y = 4.9, aes(label = my),
+  geom_text(data = ann, x = 1.5, y = 12,
+            aes(label = label_my), parse = TRUE,
             col = 1, hjust = 0) +
-  ylab("") +
+  ylab(expression(paste("Net Respiration (g C/", m^2, "/d)"))) +
   xlab(expression(paste("Water Temperature (", degree, "C)")))
 # dev.off()
 # discharge
@@ -216,35 +276,43 @@ tt <- ggplot(nhc_fall, aes(temp.water, NEP), col = 1) +
 ann = data.frame()
 for(y in 2017:2019){
   m <- summary(lm(NEP ~ log10(discharge), data = nhc_fall1[nhc_fall1$year == y,]))
-    r = round(m$adj.r.squared, 2)
-    p = round(m$coefficients[2,4],2)
+    rsqf = round(m$adj.r.squared, 2)
+    # p = round(m$coefficients[2,4],2)
     sf = round(m$coefficients[2,1],2)
-    mf = paste0("r2 = ", r, ",  p =  ", p)
-    # mf = paste0("slope = ",s, ", r2 = ", r, ",  p =  ", p)
+    # mf = paste0("r2 = ", r, ",  p =  ", p)
+    mf = paste0("slope = ",sf, ", r2 = ", rsqf)
   m <- summary(lm(NEP ~ log10(discharge), data = nhc_fall[nhc_fall$year == y,]))
-    r = round(m$adj.r.squared, 2)
-    p = round(m$coefficients[2,4],2)
+    rsqy = round(m$adj.r.squared, 2)
+    # p = round(m$coefficients[2,4],2)
     sy = round(m$coefficients[2,1],2)
-    my = paste0("r2 = ", r, ",  p =  ", p)
-    # my = paste0("slope = ",s, ", r2 = ", r, ",  p =  ", p)
+    # my = paste0("r2 = ", r, ",  p =  ", p)
+    my = paste0("slope = ",sy, ", r2 = ", rsqy)
   ann = bind_rows(ann, data.frame(year = y, mf = mf, my = my,
-                                  sf = sf, sy = sy))
+                                  sf = sf, sy = sy,
+                                  rsqf = rsqf, rsqy = rsqy))
 }
+
+ann$label_mf <- with(ann, sapply(1:nrow(ann), function(i) {
+    bquote(beta == .(ann$sf[i]) ~ "," ~ R^2 == .(ann$rsqf[i]))
+}))
+ann$label_my <- with(ann, sapply(1:nrow(ann), function(i) {
+    bquote(beta == .(ann$sy[i]) ~ "," ~ R^2 == .(ann$rsqy[i]))
+}))
 ann_full <- ann %>%
   mutate(var = 'logQ', site = length(ss)) %>%
   bind_rows(ann_full)
 # png("figures/NEP_drivers_Q.png", width = 9, height = 3.65,
 #     res = 300, units = 'in')
 qq <- ggplot(nhc_fall, aes(log10(discharge), NEP), col = 1) +
-  geom_point(size = 2) +
+  geom_point(size = 1.2) +
   facet_wrap(.~year) +
   geom_smooth(method = lm, se = F, col = 1) +
-  geom_point(data = nhc_fall1, col = fall_col, size = 2) +
+  geom_point(data = nhc_fall1, col = fall_col, size = 1.2) +
   geom_smooth(data = nhc_fall1, method = lm, se =F, col = fall_col) +
   theme_bw() +
-  geom_text(data = ann, x = -1, y = 5.4, aes(label = mf),
+  geom_text(data = ann, x = -1.2, y = 14, aes(label = label_mf), parse = TRUE,
             col = fall_col, hjust = 0) +
-  geom_text(data = ann, x = -1, y = 4.9, aes(label = my),
+  geom_text(data = ann, x = -1.2, y = 12, aes(label = label_my), parse = TRUE,
             col = 1, hjust = 0) +
   ylab(expression(paste("Net Respiration (g C/", m^2, "/d)"))) +
   xlab(expression(paste("Discharge (", m^3, "/s)"))) +
@@ -252,48 +320,48 @@ qq <- ggplot(nhc_fall, aes(log10(discharge), NEP), col = 1) +
                      labels=c(0.01, 0.1, 1))
 # dev.off()
 # DO psat
-ann = data.frame()
-for(y in 2017:2019){
-  m <- summary(lm(NEP ~ DO.obs/DO.sat, data = nhc_fall1[nhc_fall1$year == y,]))
-    r = round(m$adj.r.squared, 2)
-    p = round(m$coefficients[2,4],2)
-    sf = round(m$coefficients[2,1],2)
-    mf = paste0("r2 = ", r, ",  p =  ", p)
-    # mf = paste0("slope = ",s, ", r2 = ", r, ",  p =  ", p)
-  m <- summary(lm(NEP ~ DO.obs/DO.sat, data = nhc_fall[nhc_fall$year == y,]))
-    r = round(m$adj.r.squared, 2)
-    p = round(m$coefficients[2,4],2)
-    sy = round(m$coefficients[2,1],2)
-    my = paste0("r2 = ", r, ",  p =  ", p)
-    # my = paste0("slope = ",s, ", r2 = ", r, ",  p =  ", p)
-  ann = bind_rows(ann, data.frame(year = y, mf = mf, my = my,
-                                  sf = sf, sy = sy))
-}
-ann_full <- ann %>%
-  mutate(var = 'DO', site = length(ss)) %>%
-  bind_rows(ann_full)
-# png("figures/NEP_drivers_DO.png", width = 9, height = 3.65,
-#     res = 300, units = 'in')
-oo <- ggplot(nhc_fall, aes(DO.obs/DO.sat, NEP), col = 1) +
-  geom_point(size = 2) +
-  facet_wrap(.~year) +
-  geom_smooth(method = lm, se = F, col = 1) +
-  geom_point(data = nhc_fall1, col = fall_col, size = 2) +
-  geom_smooth(data = nhc_fall1, method = lm, se =F, col = fall_col) +
-  theme_bw() +
-  geom_text(data = ann, x = 0.5, y = 5.4, aes(label = mf),
-            col = fall_col, hjust = 0) +
-  geom_text(data = ann, x = 0.5, y = 4.9, aes(label = my),
-            col = 1, hjust = 0) +
-  ylab("") +
-  xlab("DO (% saturation)") +
-  scale_x_continuous(breaks=c(0,.25,.5,.75,1),
-                   labels=c("0","25","50", "75","100"))
+# ann = data.frame()
+# for(y in 2017:2019){
+#   m <- summary(lm(NEP ~ DO.obs/DO.sat, data = nhc_fall1[nhc_fall1$year == y,]))
+#     r = round(m$adj.r.squared, 2)
+#     p = round(m$coefficients[2,4],2)
+#     sf = round(m$coefficients[2,1],2)
+#     mf = paste0("r2 = ", r, ",  p =  ", p)
+#     # mf = paste0("slope = ",s, ", r2 = ", r, ",  p =  ", p)
+#   m <- summary(lm(NEP ~ DO.obs/DO.sat, data = nhc_fall[nhc_fall$year == y,]))
+#     r = round(m$adj.r.squared, 2)
+#     p = round(m$coefficients[2,4],2)
+#     sy = round(m$coefficients[2,1],2)
+#     my = paste0("r2 = ", r, ",  p =  ", p)
+#     # my = paste0("slope = ",s, ", r2 = ", r, ",  p =  ", p)
+#   ann = bind_rows(ann, data.frame(year = y, mf = mf, my = my,
+#                                   sf = sf, sy = sy))
+# }
+# ann_full <- ann %>%
+#   mutate(var = 'DO', site = length(ss)) %>%
+#   bind_rows(ann_full)
+# # png("figures/NEP_drivers_DO.png", width = 9, height = 3.65,
+# #     res = 300, units = 'in')
+# oo <- ggplot(nhc_fall, aes(DO.obs/DO.sat, NEP), col = 1) +
+#   geom_point(size = 2) +
+#   facet_wrap(.~year) +
+#   geom_smooth(method = lm, se = F, col = 1) +
+#   geom_point(data = nhc_fall1, col = fall_col, size = 2) +
+#   geom_smooth(data = nhc_fall1, method = lm, se =F, col = fall_col) +
+#   theme_bw() +
+#   geom_text(data = ann, x = 0.5, y = 5.4, aes(label = mf),
+#             col = fall_col, hjust = 0) +
+#   geom_text(data = ann, x = 0.5, y = 4.9, aes(label = my),
+#             col = 1, hjust = 0) +
+#   ylab("") +
+#   xlab("DO (% saturation)") +
+#   scale_x_continuous(breaks=c(0,.25,.5,.75,1),
+#                    labels=c("0","25","50", "75","100"))
 
 # dev.off()
 tiff(filename = 'figures/NEP_drivers_NHC.tif', compression = 'lzw',
-     width = 9*800, height = 9.5*800, units = 'px', res = 800)
-     ggpubr::ggarrange(tt, qq, oo, ncol = 1, align ='v')
+     width = 7.5, height = 5, units = 'in', res = 300)
+     ggpubr::ggarrange(tt, qq, ncol = 1, align ='v')
 dev.off()
 
 write_csv(ann_full, 'data/NEP_drivers_correlations_NHC_UNHC.csv')
@@ -343,9 +411,103 @@ tt <- ggplot(nhc_fall1, aes(temp.water, NEP)) +
   labs(col = "Year") +
   theme(legend.title.align = .6)
 
-tiff(filename = "figures/NEP_drivers_autumn_across_years.tif",
+tiff(filename = "figures/NEP_drivers_autumn_across_years_old.tif",
      compression = 'lzw', width = 6, height = 5*6/8.4, res = 800, units = 'in')
   ggpubr::ggarrange(tt, qq, common.legend = T, labels = c("A","B"),
+                    align = 'h', vjust = 3.5, label.y = 1.08)
+dev.off()
+
+
+
+fall_means <- nhc_fall1 %>%
+    group_by(year) %>%
+    summarize(ER_mean = mean(ER, na.rm = T),
+              ER_sd = sd(ER, na.rm = T),
+              discharge_mean = median(discharge, na.rm = T),
+              discharge_sd = sd(discharge, na.rm = T))
+qq <- nhc_fall1 %>%
+    left_join(select(fall_means, year, discharge_mean), by = 'year') %>%
+ggplot( aes(log10(discharge_mean), ER, group = year,
+            fill = factor(year))) +
+  geom_boxplot(width = 0.2) +
+  geom_text(data = fall_means, aes(x = log10(discharge_mean),
+                                   y = -0.5, label = year,
+                                   col = factor(year)),
+            hjust = 0.5, vjust = 0.5, size = 3) +
+  theme_bw()+
+  ylab("") +
+  # ylab(expression(paste("Ecosystem Respiration (g ", O[2], m^-2, d^-1, ")"))) +
+  xlab(expression(paste("Median Fall Discharge (", m^3, s^-1, ")"))) +
+  scale_x_continuous(breaks=c(-2,-1,0),
+                     labels=c(0.01, 0.1, 1)) +
+  theme(legend.position = 'none')
+
+tt <- ggplot(nhc_fall1, aes(temp.water, ER)) +
+  geom_point(size = 1.2) +
+  geom_point(aes(col = factor(year)), size = 1.2) +
+  geom_smooth(aes(col = factor(year)),method = lm, se = F) +
+  theme_bw()+
+  geom_text(aes(x = 22.5, y = -11), label = "2017", col = '#F8766D', size = 3)+
+  geom_text(aes(x = 22, y = -1.5), label = "2018", col = '#00BA38', size = 3)+
+  geom_text(aes(x = 23, y = -8.4), label = "2019", col = '#619CFF', size = 3)+
+  ylab(expression(paste("ER (g ", O[2], m^-2, d^-1, ")"))) +
+  xlab(expression(paste("Water Temperature (",degree,"C)"))) +
+  # ggtitle("Autumn Respiration Across Years (Oct - Nov)") +
+  labs(col = "Year") +
+  theme(legend.position = 'none')
+
+# tiff(filename = "figures/NEP_drivers_autumn_across_years.tif",
+#      compression = 'lzw', width = 6, height = 3, res = 300, units = 'in')
+png(filename = "figures/NEP_drivers_autumn_across_years.png",
+     width = 6, height = 3, res = 300, units = 'in')
+  ggpubr::ggarrange(tt, qq,  labels = c("a","b"),
+                    align = 'h', vjust = 3.5, label.y = 1.08)
+
+dev.off()
+
+
+  nhc_spring <- nhc_fall %>% filter(month %in% c(3,4,5))
+  spring_means <- nhc_spring %>%
+      group_by(year) %>%
+      summarize(GPP_mean = mean(GPP, na.rm = T),
+                GPP_sd = sd(GPP, na.rm = T),
+                discharge_mean = median(discharge, na.rm = T),
+                discharge_sd = sd(discharge, na.rm = T))
+
+  nhc_spring %>%
+    left_join(select(spring_means, year, discharge_mean), by = 'year') %>%
+ggplot( aes(log10(discharge_mean), GPP, group = year,
+            fill = factor(year))) +
+  geom_boxplot(width = 0.2) +
+  geom_text(data = spring_means, aes(x = log10(discharge_mean),
+                                   y = -0.5, label = year,
+                                   col = factor(year)),
+            hjust = 0.5, vjust = 0.5, size = 3) +
+  theme_bw()+
+  ylab("") +
+  # ylab(expression(paste("Ecosystem Respiration (g ", O[2], m^-2, d^-1, ")"))) +
+  xlab(expression(paste("Median Fall Discharge (", m^3, s^-1, ")"))) +
+  scale_x_continuous(breaks=c(-2,-1,0),
+                     labels=c(0.01, 0.1, 1)) +
+  theme(legend.position = 'none')
+
+ggplot(nhc_fall, aes(temp.water, GPP)) +
+  geom_point(size = 1.2) +
+  geom_point(aes(col = factor(year)), size = 1.2) +
+  geom_smooth(aes(col = factor(year)),method = lm, se = F) +
+  theme_bw()+
+  # geom_text(aes(x = 22.5, y = -11), label = "2017", col = '#F8766D', size = 3)+
+  # geom_text(aes(x = 22, y = -1.5), label = "2018", col = '#00BA38', size = 3)+
+  # geom_text(aes(x = 23, y = -8.4), label = "2019", col = '#619CFF', size = 3)+
+  ylab(expression(paste("ER (g ", O[2], m^-2, d^-1, ")"))) +
+  xlab(expression(paste("Water Temperature (",degree,"C)"))) +
+  # ggtitle("Autumn Respiration Across Years (Oct - Nov)") +
+  labs(col = "Year") +
+  theme(legend.position = 'none')
+
+tiff(filename = "figures/NEP_drivers_autumn_across_years.tif",
+     compression = 'lzw', width = 6, height = 3, res = 800, units = 'in')
+  ggpubr::ggarrange(tt, qq,  labels = c("a","b"),
                     align = 'h', vjust = 3.5, label.y = 1.08)
 dev.off()
 

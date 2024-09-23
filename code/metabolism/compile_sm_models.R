@@ -26,6 +26,8 @@ for(file in filelist) {
     tmp <- str_match(string = file,
                      pattern = '^[a-z]+_([a-z]+)_?([0-9]+)?_([a-z]+_[a-z]+)')
     site <- tmp[2]
+    year <- as.numeric(tmp[3])
+    if(is.na(year)) {year <- 2019}
     method <- tmp[4]
 
     # Incorporate something here to look at obs and proc error
@@ -43,16 +45,18 @@ for(file in filelist) {
     out <- filter_model(fit, flow_dates)
     preds <- out[[1]]
     coverage <- data.frame(site = site,
-                           method = method)
+                           method = method, year = year)
     coverage <- bind_cols(coverage, out[[2]])
 
     out <- fill_summarize_met(preds)
     cum <- out[[1]] %>%
         mutate(site = site,
-               method = method)
+               method = method,
+               year = year)
     preds <- preds %>%
         mutate(site = site,
-               method = method)
+               method = method,
+               year = year)
 
     # bad <- unique(preds$date[is.na(preds$GPP) & is.na(preds$ER)])
     # dat <- fit@data %>%
@@ -71,7 +75,7 @@ for(file in filelist) {
     #                                 "K600_daily[20]"), nrow = 5)
     # plot_diagnostics(fit, preds, paste(site, year, method),
     #                  ylim = c(-15, 7), lim = 7)
-    tiff(paste0('figures/SI/model_fit_', site, '.tiff'),
+    tiff(paste0('figures/SI/model_fit_', site, year, '.tiff'),
         width = 6*800, height = 3*800, res = 800, units = 'px',
         compression = 'lzw')
         par(ps = 10,
@@ -79,7 +83,7 @@ for(file in filelist) {
             mar = c(3, 4, 2, 0),
             oma = c(0, 0, 0, 2))
         plot_binning2(fit, preds)
-        sitename <- sn$sn[sn$site == site]
+        sitename <- paste(toupper(site), year, sep = " ")
         mtext(sitename, 2, line = 3)
         plot_KvER(preds)
 
@@ -99,7 +103,26 @@ saveRDS(list(preds = all_preds,
         "data/metabolism/compiled/raymond_met.rds")
 
 
+all_preds %>%
+    filter(site %in% c('cbp', 'nhc')) %>%
+    summary()
 
+preds <- all_preds %>%
+    filter(site %in% c('cbp', 'nhc')) %>%
+    mutate(NEP = GPP+ER,
+           PR = -GPP/ER)
+
+summary(preds)
+length(which(preds$NEP < 0))/length(which(!is.na(preds$NEP)))
+
+preds %>% filter(site != 'cbp') %>%
+    mutate(year = year(date)) %>%
+    group_by(year) %>%
+    summarize(across(c('GPP','ER'),
+                     .fns = c(mean = \(x) mean(x, na.rm = T),
+                              max = \(x) max(x, na.rm = T),
+                              min = \(x) min(x, na.rm = T),
+                              cv = \(x) sd(x, na.rm = T)/mean(x, na.rm = T))))
 
 # png('figures/SI/KQ_KER_plots_SMfits.png', width = 7.5, height = 7,
 #     res = 300, units = 'in')
