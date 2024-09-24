@@ -256,11 +256,11 @@ Data from tables and digitized from plots in Hall 1970 and 1972.
 <!-- Timeseries Model -->
 ### Timeseries Model
 
-**1. Arima_models_of_met.R **
-    - timeseries models using the Arima function in the forecast package to hindcast metabolism and make plots.
+**1. ARIMA_BRMS_models_of_met.R **
+    - timeseries models using 1) the Arima function in the forecast package then 2)BRMS models to hindcast metabolism and make plots.
 
-**2. brms_met_of_temp.R **
-    - bayesian timeseries models in BRMS to hindcast and make plots.
+**2. trial_mods_met_of_temp.R **
+    - trial timeseries models to hindcast.
     
 **3. fit_stan_models.R **
     - prep data and run stan code to fit time series models and make a forecast 

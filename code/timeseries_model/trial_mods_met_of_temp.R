@@ -16,7 +16,7 @@ sites <- read_csv('data/siteData/NHCsite_metadata.csv') %>%
 
 hall <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_O2.rds")
 hall <- hall$preds %>% filter(era == 'then', site == 'CBP')
-hall_QT <- read_csv('data/hall/hall_discharge_temp_daily.csv')
+hall_QT <- read_csv('data/hall_data/hall_discharge_temp_daily.csv')
 
 
 # Test basic GPP model
