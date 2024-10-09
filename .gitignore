@@ -1,10 +1,9 @@
-
+data
 !data/hall_data
 !data/gee
 !data/map_files
 !data/watershed_boundary
 .Rhistory
-/figures
 *.doc
 .Rproj.user
 
@@ -17,7 +16,6 @@ data_bak
 .Rproj.user
 *.tiff
 *.tif
-*.png
 map_files_archived/map_files
 *.zip
 

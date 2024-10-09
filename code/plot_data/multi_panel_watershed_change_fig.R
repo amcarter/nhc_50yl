@@ -11,7 +11,6 @@ nldas <- read_csv("data/watershed/nldas.csv") %>%
                           "min_relative_humidity",
                           "surface_downwelling_shortwave_flux_in_air"))
 
-
 pp_annual = read_csv('data/watershed/prism_raw.csv') %>%
   mutate(year = year(DateTime)) %>%
   dplyr::select(year, ppt_mm = '1') %>%
@@ -46,7 +45,7 @@ plot(p19$datetime, p19$pre_cum, type = "l")
 p19
 
 
-# NLCD Land Cover ####
+# NLCD Land Cover (stats) ####
 dat <- read_csv("data/watershed/nlcd_1992-2016_summary.csv") %>%
   filter(!is.na(category)) %>%
   mutate(category = case_when(id %in% c(22, 23, 24) ~ 'developed',
@@ -288,7 +287,7 @@ dev.off()
 
 
 dir.create('figures', showWarnings = FALSE)
-png("figures/Climate_Watershed_Multipanel_figure.png", width = 4, height = 5,
+png("figures/Climate_Watershed_Multipanel_figure.png", width = 4, height = 3.5,
     units = 'in', res = 800, type = 'cairo')
 # tiff("figures/Climate_Watershed_Multipanel_figure.tif", width = 4, height = 5,
 #     units = 'in', res = 800, compression = 'lzw')
@@ -299,16 +298,17 @@ prod_col = 'forestgreen'
 
 m <- cbind(c(1,1,2,2,3,3,4,4))
 layout(m)
-
+library(forecast)
 #air
 par(mar = c(0,2,0,1),
     oma = c(0.5, 2, 0.5, 0),
     adj = 0, ps = 10)
 plot(cc$year, cc$temp_mean, type = 'l', lwd = 1.2, xaxt = 'n', yaxt = 'n',
      col = dat_col, ylim = c(13.5, 17),bty = 'n')
-# mtext("Climate Change", 3, 1, cex = 0.9)
 mm <- lm(temp_mean~year, data = cc)
+m_ar1 <- forecast::Arima(cc$temp_mean, order = c(1, 0, 0), xreg = matrix(cc$year, ncol = 1))
 conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
+# conf_interval <- predict(m_ar1, newxreg = cc$year)
 lines(1968:2019, conf_interval$fit, col = dat_col)
 polygon(c(1968:2019, 2019:1968), c(conf_interval$lwr, rev(conf_interval$upr)),
         col = alpha(dat_col, .3), border = NA)
@@ -320,13 +320,16 @@ lines(1968:2019, conf_interval$fit, col = dat_col)
 polygon(c(1968:2019, 2019:1968), c(conf_interval$lwr, rev(conf_interval$upr)),
         col = alpha(dat_col, .3), border = NA)
 mtext('Air Temp C', 2, 2.7, cex = .8)
-text(1982, 14.2,'Daily mean, slope = 0.4 C/decade', col = dat_col, cex = 1)
+text(1982, 14.2, 'Daily mean, slope = 0.41 ± 0.06 C/decade', col = dat_col, cex = 1)
 
 #precip
 plot(cc$year, cc$cumulative_precip, type = 'l', lwd = 1.2, col = precip_col,
      axes = F, ylim = c(0.9, 1.7), xpd = NA, ylab = '', xlab = '')
 axis(2, at = c(0.9, 1.3, 1.7), las = 2)
 mtext('Annual Precip (m)', 2, 2.7, cex = .8)
+
+#% extreme
+m_ar1 <- forecast::Arima(cc$percent_extreme, order = c(1, 0, 0), xreg = matrix(cc$year, ncol = 1))
 plot(cc$year, cc$percent_extreme, type = 'l', lwd = 1.2, col = precip_col, axes = F)
 axis(2, at = c(60, 70, 80), labels = c('60%', '70%', '80%'), las = 2)
 mtext('% Extreme', 2, 2.7, cex = .8)
@@ -335,7 +338,10 @@ conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
 lines(1979:2019, conf_interval$fit, col = precip_col)
 polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
         col = alpha(precip_col, .3), border = NA)
-text(1970, 75, 'slope = 2.9%/decade', col = precip_col, cex = 1)
+text(1970, 75, 'slope = 2.97 ± 0.06%/decade', col = precip_col, cex = 1)
+
+#no precip days
+m_ar1 <- forecast::Arima(cc$zero_days, order = c(1, 0, 0), xreg = matrix(cc$year, ncol = 1))
 plot(cc$year, cc$zero_days, type = 'l', lwd = 1.2, col = precip_col, axes = F)
 axis(2, las = 2)#, at = c(60, 70, 80), labels = c('60%', '70%', '80%'))
 mtext('No Precip Days', 2, 2.7, cex = .8)
@@ -344,7 +350,7 @@ conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
 lines(1979:2019, conf_interval$fit, col = precip_col)
 polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
         col = alpha(precip_col, .3), border = NA)
-text(1970, 220, 'slope = 12 days/decade', col = precip_col, cex = 1)
+text(1970, 220, 'slope = 12.1 ± 0.2 days/decade', col = precip_col, cex = 1)
 rect(1967, 152.5,2020,537,xpd = NA)
 
 dev.off()
