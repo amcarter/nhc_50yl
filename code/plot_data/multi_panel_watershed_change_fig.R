@@ -45,7 +45,8 @@ plot(p19$datetime, p19$pre_cum, type = "l")
 p19
 
 
-# NLCD Land Cover (stats) ####
+# NLCD Land Cover (stats) [OBSOLETE] ####
+
 dat <- read_csv("data/watershed/nlcd_1992-2016_summary.csv") %>%
   filter(!is.na(category)) %>%
   mutate(category = case_when(id %in% c(22, 23, 24) ~ 'developed',
@@ -156,7 +157,7 @@ summary(lm(cumulative~year, data = cc))
 #   theme_bw()
 # dev.off()
 
-# make multipanel figure (v1) ####
+# make multipanel figure (v1, obsolete) ####
 
 dir.create('figures', showWarnings = FALSE)
 tiff("figures/Climate_Watershed_Multipanel_figure.tif", width = 6, height = 5.4,
@@ -320,7 +321,7 @@ lines(1968:2019, conf_interval$fit, col = dat_col)
 polygon(c(1968:2019, 2019:1968), c(conf_interval$lwr, rev(conf_interval$upr)),
         col = alpha(dat_col, .3), border = NA)
 mtext('Air Temp C', 2, 2.7, cex = .8)
-text(1982, 14.2, 'Daily mean, slope = 0.41 ± 0.06 C/decade', col = dat_col, cex = 1)
+text(1982, 14.2, 'Daily mean, slope = 0.41 ± 0.06°C/decade', col = dat_col, cex = 1)
 
 #precip
 plot(cc$year, cc$cumulative_precip, type = 'l', lwd = 1.2, col = precip_col,
