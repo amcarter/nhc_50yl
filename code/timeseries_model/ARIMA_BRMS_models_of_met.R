@@ -17,7 +17,7 @@ sites <- read_csv('data/siteData/NHCsite_metadata.csv') %>%
 
 hall <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_O2.rds")
 hall <- hall$preds %>% filter(era == 'then', site == 'CBP')
-hall_QT <- read_csv('data/hall/hall_discharge_temp_daily.csv')
+hall_QT <- read_csv('data/hall_data/hall_discharge_temp_daily.csv')
 
 
 
@@ -40,7 +40,7 @@ scaling_pars <- P %>%
 min_Q = min(P$discharge[P$site == 'CBP'], na.rm = T)
 
 # select a small value to add to the observations before log transforming:
-epsilon = 1e-4
+epsilon = 1e-1
 
 P_scaled <- P %>%
     ungroup() %>%
@@ -53,6 +53,8 @@ P_scaled <- P %>%
            CBP = case_when(site == 'CBP' ~ 1,
                            TRUE ~ 0)) %>%
     slice(-c(1, 362:386, 1506)) # remove leading and ending NA's in metabolism from each site
+plot(density(log(P_scaled$GPP), na.rm = T))
+plot(density(log(-P_scaled$ER), na.rm = T))
 
 P$light_smooth <- (zoo::rollmean(P$light, k = 7, fill = NA))
 # add light data to hall:
@@ -223,6 +225,7 @@ hall_pred_sum <- hall_scaled %>%
                               sd = \(x) sd(x, na.rm = T)))) %>%
     mutate(month_name = month.abb) %>%
     ungroup()
+
 hall_sum <-hall %>%
     select(date, GPP, ER) %>%
     mutate(month = month(date)) %>%
@@ -297,7 +300,7 @@ dev.off()
 
 ################################################################################
 
-# try with brms (also old code):
+# try with brms:
 # regenrate the prediction data frame:
 
 hall_scaled <- hall_preds %>%
@@ -323,6 +326,22 @@ bmod_GPP <- brm(bform_GPP,
                 control = list(adapt_delta = 0.99,
                                max_treedepth = 12) )
 
+# evaluate model fit:
+summary(bmod_GPP)
+
+png('figures/SI/BRMS_gpp_posterior_pred_check.png', width = 5, height = 4,
+    units = 'in', res = 300)
+
+y_rep <- posterior_predict(bmod_GPP)
+n_sims <- nrow(y_rep)
+plot(density(P_scaled$log_GPP, na.rm = T), main = 'Posterior predictions of GPP',
+     xlab = 'log GPP')
+for(s in sample(n_sims, 100)){
+    lines(density(y_rep[s,]), col = 'grey', alpha = 0.3)
+}
+lines(density(P_scaled$log_GPP, na.rm = T))
+
+dev.off()
 
 draws_fit <- as_draws_array(bmod_GPP)
 GPP_pars <- posterior::summarize_draws(draws_fit) %>%
@@ -330,13 +349,14 @@ GPP_pars <- posterior::summarize_draws(draws_fit) %>%
                             'ar[1]', 'sigma', 'r_site[CBP,Intercept]',
                             'r_site[NHC,Intercept]', 'sd_site__Intercept')) %>%
     mutate(model = 'GPP')
-str(draws_fit)
 
 pd <- posterior::subset_draws(draws_fit,
                         variable = c('b_Intercept', 'b_temp.water', 'b_light',
                                      'ar[1]', 'sigma', 'r_site[CBP,Intercept]',
                                      'r_site[NHC,Intercept]'),
                         draw = 1:2000)
+
+
 post <- data.frame(matrix(pd, nrow = 2000, byrow = FALSE))
 colnames(post) <- c('intercept', 'b_temp.water', 'b_light', 'phi', 'sigma',
                   'cbp_intercept', 'nhc_intercept')
@@ -350,6 +370,7 @@ post_preds[, 1] <- matrix(
     rep(log(mean(hall$GPP, na.rm = T) + epsilon), each = draws),
     nrow = draws, ncol = 1
 )
+post_preds_err <- post_preds
 
 for(i in 1:draws){
     for(t in 2:nrow(hall_scaled)){
@@ -358,27 +379,44 @@ for(i in 1:draws){
             post$b_temp.water[i] * hall_scaled$temp.water[t] +
             post$phi[i] * post_preds[i, t-1] -
             post$phi[i] * (post$b_light[i] * hall_scaled$light[t-1] +
-            post$b_temp.water[i] * hall_scaled$temp.water[t-1])#+ rnorm(1, sd = sigma_post[i])
+            post$b_temp.water[i] * hall_scaled$temp.water[t-1])#+ rnorm(1, mean = 0, sd = post$sigma[i])
     }
+
+    post_preds_err[i,] <- rnorm(nrow(hall_scaled), post_preds[i,], post$sigma[i])
 }
+
 
 hindcast_GPP <- data.frame(
     date = hall_scaled$date,
     GPP_pred = apply(post_preds, 2, mean),
     GPP_low = apply(post_preds, 2, quantile, probs = 0.025),
-    GPP_high = apply(post_preds, 2, quantile, probs = 0.975)
+    GPP_high = apply(post_preds, 2, quantile, probs = 0.975),
+    GPP_err_low = apply(post_preds_err, 2, quantile, probs = 0.025),
+    GPP_err_high = apply(post_preds_err, 2, quantile, probs = 0.975)
 ) %>%
     mutate(GPP = exp(GPP_pred) - epsilon,
            GPP_low = exp(GPP_low)- epsilon,
-           GPP_high = exp(GPP_high - epsilon))
+           GPP_high = exp(GPP_high - epsilon),
+           GPP_err_low = exp(GPP_err_low)- epsilon,
+           GPP_err_high = exp(GPP_err_high - epsilon))
 
 ggplot(hindcast_GPP, aes(date, GPP), col = 2) +
+    geom_ribbon(aes(ymin = GPP_err_low, ymax = GPP_err_high),
+                col = NA, fill = 'grey80') +
     geom_ribbon(aes(ymin = GPP_low, ymax = GPP_high),
-                col = NA, fill = 'grey') +
+                col = NA, fill = 'grey50') +
     geom_line() +
     geom_point(data = hall,  col = 2)
 
 
+
+plot(hindcast_GPP$date, hindcast_GPP$GPP, type = 'l', ylim = c(0,10))
+for(s in sample(draws, 100)){
+    lines(hindcast_GPP$date, exp(post_preds[s,])-epsilon, col = alpha('grey', 0.3))
+}
+
+lines(hindcast_GPP$date, hindcast_GPP$GPP)
+points(hall$date, hall$GPP, col = 2, pch = 20)
 # model for ER
 
 bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water + light + log_Q)
@@ -394,7 +432,50 @@ bmod_ER <- brm(bform_ER,
                control = list(adapt_delta = 0.99,
                               max_treedepth = 12))
 
+
 summary(bmod_ER)
+
+png('figures/SI/BRMS_er_posterior_pred_check.png', width = 5, height = 4,
+    units = 'in', res = 300)
+
+y_rep <- posterior_predict(bmod_ER)
+n_sims <- nrow(y_rep)
+plot(density(P_scaled$log_ER, na.rm = T), main = 'Posterior predictions of ER',
+     xlab = 'log ER')
+for(s in sample(n_sims, 100)){
+    lines(density(y_rep[s,]), col = 'grey', alpha = 0.3)
+}
+lines(density(P_scaled$log_ER, na.rm = T))
+
+dev.off()
+
+
+brms::bayes_R2(bmod_ER)
+
+# args_y <- list(bmod_ER)
+# args_ypred <- list(bmod_ER)
+#
+#     y <- do_call(get_y, args_y)
+#     ypred <- do_call(posterior_epred, args_ypred)
+#     if (is_ordinal(family(object, resp = resp[i]))) {
+#         ypred <- ordinal_probs_continuous(ypred)
+#     }
+#     R2[[i]] <- .bayes_R2(y, ypred)
+# }
+# R2 <- do_call(cbind, R2)
+# colnames(R2) <- paste0("R2", resp)
+# if (summary) {
+#     R2 <- posterior_summary(R2, probs = probs, robust = robust)
+# }
+# R2
+# function (y, ypred, ...)
+# {
+#     e <- t(t(post_preds_ER) - P_scaled$log_ER)
+#     var_ypred <- matrixStats::rowVars(post_preds_ER)
+#     var_e <- matrixStats::rowVars(e)
+#     as.matrix(var_ypred/(var_ypred + var_e))
+# }
+
 draws_fit_ER <- as_draws_array(bmod_ER)
 ER_pars <- posterior::summarize_draws(draws_fit_ER) %>%
     filter(variable %in% c('b_Intercept', 'b_temp.water', 'b_light',
@@ -422,7 +503,7 @@ post_preds_ER[, 1] <- matrix(
     rep(log(mean(-hall$ER, na.rm = T) + epsilon), each = draws),
     nrow = draws, ncol = 1
 )
-
+post_preds_err_ER <- post_preds_ER
 
 for(i in 1:draws){
     for(t in 2:nrow(hall_scaled)){
@@ -433,23 +514,42 @@ for(i in 1:draws){
             post$phi[i] * post_preds_ER[i, t-1] -
             post$phi[i] * (post$b_light[i] * hall_scaled$light[t-1] +
                                post$b_temp.water[i] * hall_scaled$temp.water[t-1] +
-                               post$b_logQ[i] * hall_scaled$log_Q[t-1])
+                               post$b_logQ[i] * hall_scaled$log_Q[t-1]) #+ rnorm(1, sd = post$sigma[i])
     }
+    post_preds_err_ER[i,] <- rnorm(nrow(hall_scaled), post_preds_ER[i,], post$sigma[i])
+
 }
 
 hindcast_ER <- data.frame(
     date = hall_scaled$date,
     ER_pred = apply(post_preds_ER, 2, mean),
     ER_low = apply(post_preds_ER, 2, quantile, probs = 0.025),
-    ER_high = apply(post_preds_ER, 2, quantile, probs = 0.975)
+    ER_high = apply(post_preds_ER, 2, quantile, probs = 0.975),
+    ER_err_low = apply(post_preds_err_ER, 2, quantile, probs = 0.025),
+    ER_err_high = apply(post_preds_err_ER, 2, quantile, probs = 0.975)
 ) %>%
     mutate(ER = -exp(ER_pred) + epsilon,
            ER_low = -exp(ER_low) + epsilon,
-           ER_high = -exp(ER_high + epsilon))
+           ER_high = -exp(ER_high) + epsilon,
+           ER_err_low = -exp(ER_err_low) + epsilon,
+           ER_err_high = -exp(ER_err_high + epsilon))
+
+
+
+plot(hindcast_ER$date, hindcast_ER$ER, type = 'l', ylim = c(-20,0))
+for(s in sample(draws, 100)){
+    lines(hindcast_ER$date, -exp(post_preds_ER[s,]) + epsilon,alpha = 0.1)
+}
+
+lines(hindcast_ER$date, hindcast_ER$ER)
+points(hall$date, hall$ER, col = 2, pch = 20)
+
 
 ggplot(hindcast_ER, aes(date, ER), col = 2) +
+    geom_ribbon(aes(ymin = ER_err_low, ymax = ER_err_high),
+                col = NA, fill = 'grey80') +
     geom_ribbon(aes(ymin = ER_low, ymax = ER_high),
-                col = NA, fill = 'grey') +
+                col = NA, fill = 'grey50') +
     geom_line() +
     geom_point(data = hall,  col = 2)
 
@@ -473,10 +573,14 @@ png('figures/BRMS_hindcast_comparison_daily.png', width = 7.5, height = 4,
      units = 'in', res = 300)
 
 ggplot(hindcast) +
+    geom_ribbon(aes(x = date, ymin = ER_err_high, ymax = ER_err_low),
+                col = NA, fill = 'grey80') +
     geom_ribbon(aes(x = date, ymin = ER_high, ymax = ER_low),
-                col = NA, fill = 'grey') +
+                col = NA, fill = 'grey60') +
+    geom_ribbon(aes(x = date, ymin = GPP_err_low, ymax = GPP_err_high),
+                col = NA, fill = 'grey80') +
     geom_ribbon(aes(x = date, ymin = GPP_low, ymax = GPP_high),
-                col = NA, fill = 'grey') +
+                col = NA, fill = 'grey60') +
     geom_line(aes(x = date, y = ER, color = "AR1 Hindcast")) +
     geom_line(aes(x = date, y = GPP, color = "AR1 Hindcast")) +
     geom_point(aes(x = date, y = ER_measured, color = "Historical Data")) +
@@ -489,9 +593,12 @@ ggplot(hindcast) +
     scale_color_manual(
         values = c("AR1 Hindcast" = "black", "Historical Data" = "brown3")
     ) +
-    guides(color = guide_legend(override.aes = list(shape = c(NA, 16), linetype = c(1, 0)))) +
+    guides(color = guide_legend(override.aes = list(shape = c(NA, 16),
+                                                    linetype = c(1, 0)),
+                                ncol = 2)) +
     theme(
-        legend.position = c(0.02, 0.97), # Upper-left inside the plot
+        legend.background = element_rect(fill = 'transparent'),
+        legend.position = c(0.02, 0.13), # Upper-left inside the plot
         legend.justification = c(0, 1),
         legend.title = element_blank(),
     )
