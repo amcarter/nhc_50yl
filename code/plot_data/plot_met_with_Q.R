@@ -203,6 +203,8 @@ litter <- slice(LAI, -1) %>%
                                TRUE ~ NA_character_)) %>%
     left_join(select(nhc, date, discharge, temp.water))
 
+
+#### Plot components start here
 lsum <- litter %>%
     group_by(year, lf_type) %>%
     summarize(start = min(doy),
@@ -230,23 +232,27 @@ sumsum <- ggpubr::ggarrange(qsum, tsum)
 
 met <-
     ggplot(nhc, aes(doy)) +
-    geom_ribbon(aes(ymin = GPP_fill, ymax = -ER_fill),
-                alpha = 0.2, color = NA)+
-    geom_ribbon(aes(ymax = GPP_high, ymin = -ER_fill),
-                fill = 'white',color = NA)+
+    # geom_ribbon(aes(ymin = GPP_fill, ymax = -ER_fill),
+    #             alpha = 0.2, color = NA)+
+    # geom_ribbon(aes(ymax = GPP_high, ymin = -ER_fill),
+    #             fill = 'white',color = NA)+
+    geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper),
+                col = NA, fill = alpha("GPP", 0.1))+
+    geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper),
+                col = NA, fill = alpha("ER", 0.1))+
     geom_line(aes(y = GPP, col = "GPP"), size = 0.72) +
-    geom_line(aes(y = -ER, col = "ER"), size = 0.72) +
+    geom_line(aes(y = ER, col = "ER"), size = 0.72) +
     geom_segment( aes(x = hurricane, y = 4, xend = hurricane, yend = 2),
                   arrow = arrow(length = unit(0.12, 'inches')),
                   linewidth = 1, col = colors[4])+
     geom_text(aes(x = hurricane, y = 3.5, label = 'Hurricane'),
               hjust = 0, vjust = 0, nudge_x = 2, col = colors[4])+
-    geom_hline(aes(yintercept = 0))+
+    geom_hline(aes(yintercept = 0), linewidth = 0.3)+
     geom_line(data = rename(lsum, Litterfall = lf_type),
               aes(doy, level, lty = Litterfall),
               linewidth = 1, col = colors[3])+
     facet_grid(year~., scales = 'free_x')+
-    ylim(0, 6.5)+
+    # ylim(0, 6.5)+
     labs(x = "Day of year",
          y = "Metabolism (gC/m2/d)",
          color = "Metabolism") +
@@ -310,7 +316,7 @@ ggplot(aes(doy, temp.water)) +
 
 
 p2 <- ggpubr::ggarrange(fd, wt, common.legend = TRUE, nrow = 2)
-p2 <- ggpubr::ggarrange(fd, td, common.legend = TRUE, nrow = 2)
+# p2 <- ggpubr::ggarrange(fd, td, common.legend = TRUE, nrow = 2)
 p3 <- ggpubr::ggarrange(sumsum, p2, heights = c(1,2), nrow = 2, align = 'h')
 
 png(filename = 'figures/NHC_3year_met.png', width = 10, height = 4.5,
