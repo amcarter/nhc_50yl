@@ -82,6 +82,10 @@ reclass_matrix <- matrix(c(
 # Reclassify raster using classify
 nlcd <- reclassify(nlcd, reclass_matrix)
 
+nlcd_totals <- table(values(nlcd))
+names(nlcd_totals) <- recode(names(nlcd_totals), !!!c('1'='developed', '2'='forested', '3'='ag', '4'='grass/shrub'))
+nlcd_totals / sum(nlcd_totals) * 100
+
 nlcd_colors <- c(
     # "#A7D282",  # 21 - Developed, Open Space
     # "#FF0000",  # 23 - Developed, Medium Intensity

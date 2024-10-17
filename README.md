@@ -79,16 +79,19 @@ NOTE: most of this data not used in this study.
     - data and calculated metrics (Richards Baker Index (RBI), autoregressive coefficient (ar_1), and 5th quantile of discharge (q05)) for discharge at the Eno River USGS gauge, from a basin neighboring NHC.
 
 **2. nlcd_1992-2016_summary.csv**
-    - Data from the National Land Cover Dataset on total land area (CellTally) in the NHC watershed in each land use category during each survey year. (see DataS4 to generate)
+    - Data from the National Land Cover Dataset on total land area (CellTally) in the NHC watershed in each land use category during each survey year.
 
 **3. nldas.csv**
-    - Data on precipitation from NLDAS summarized over the watershed area (see DataS4 to generate)
+    - Data on precipitation from NLDAS summarized over the watershed area
 
 **4. noaa_air_temp.csv**
     - Daily air temperature data from the National Oceanic and Atmospheric Administration based on the latitude and longitude of the study reach outlet.
 
 **5. prism_raw.csv**
-    - Precipitation data from PRISM. (see DataS4 to generate)
+    - Precipitation data from PRISM.
+
+**6. historical_air_temperature.csv**
+    - ECMWF reanalysis.
 
 <!-- Hall 1970 data -->
 ## Hall 1970 Data
@@ -180,6 +183,9 @@ Data from tables and digitized from plots in Hall 1970 and 1972.
     
 **10. get_light_from_StreamLight.R**
     - download light data from NLDAS and APPEARS databases and process using the streamlight package to estimate stream surface light at all sites.
+
+**11. gee_retrieve.R**
+    - pull ECMWF surface temperature reanalysis data from Google Earth Engine
 
 <!-- metabolism model -->
 ### Metabolism Model
