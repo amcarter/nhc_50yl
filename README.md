@@ -90,9 +90,6 @@ NOTE: most of this data not used in this study.
 **5. prism_raw.csv**
     - Precipitation data from PRISM.
 
-**6. historical_air_temperature.csv**
-    - ECMWF reanalysis.
-
 <!-- Hall 1970 data -->
 ## Hall 1970 Data
 
@@ -183,9 +180,6 @@ Data from tables and digitized from plots in Hall 1970 and 1972.
     
 **10. get_light_from_StreamLight.R**
     - download light data from NLDAS and APPEARS databases and process using the streamlight package to estimate stream surface light at all sites.
-
-**11. gee_retrieve.R**
-    - pull ECMWF surface temperature reanalysis data from Google Earth Engine
 
 <!-- metabolism model -->
 ### Metabolism Model
