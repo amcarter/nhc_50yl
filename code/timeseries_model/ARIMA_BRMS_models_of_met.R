@@ -348,6 +348,8 @@ bind_rows(GPP_pars, ER_pars) %>%
 ################################################################################
 # Make Figures:
 
+hindcast <- left_join(hindcast, select(hall_QT, date, discharge_m3s))
+
 tiff('figures/BRMS_hindcast_comparison_daily.tiff', width = 7.5, height = 4,
      units = 'in', res = 300)
 # png('figures/BRMS_hindcast_comparison_daily.png', width = 7.5, height = 4,
@@ -641,7 +643,7 @@ P_scaled$fit_se <- fitted_values$se.fit
 # Plot the original data and the fitted values
 ggplot(P_scaled, aes(x = date, y = GPP)) +
     geom_point(color = "blue", alpha = 0.6) +  # Original data points
-    geom_line(aes(y = fitted_values), color = "red", size = 1) +  # Fitted values from the model
+    geom_line(aes(y = fitted_values), color = "red", linewidth = 1) +  # Fitted values from the model
     geom_ribbon(aes(ymin = fitted_values - 2*fit_se,
                     ymax = fitted_values + 2*fit_se))+
     labs(title = "GAM Fit to Original Data",

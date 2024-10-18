@@ -178,14 +178,16 @@ nhc <- preds_nhc %>%
            GPP_high = case_when(GPP_fill > -ER_fill ~ GPP_fill,
                                 TRUE ~ NA_real_))
 
-color_pal <- c("GPP" = colors[1], "ER" = colors[2],
-               "Net Heterotrophy" = alpha('black', 0.2))
+# color_pal <- c("GPP" = colors[1], "ER" = colors[2],
+#                "Net Heterotrophy" = alpha('black', 0.2))
+gppcol <- colors[1]
+ercol <- colors[2]
 
     # mutate(date = case_when(year == 2017 ~ date + 365*2,
     #                         year == 2018 ~ date + 365,
     #                         TRUE ~ date)) %>%
 
-LAI <- read_csv('../data/light/drivers/daily_modeled_light_all_sites.csv') %>%
+LAI <- read_csv('data/daily_modeled_light_all_sites.csv') %>%
     mutate(year = year(date)) %>%
     filter(site == 'NHC')
 lf <- stats::filter(x =diff(LAI$LAI),
@@ -213,7 +215,7 @@ lsum <- litter %>%
     pivot_longer(cols = c('start', 'end'),
                  names_to = 'name',
                  values_to = 'doy') %>%
-    mutate(level = 6)
+    mutate(level = 2)
 
 qsum <- litter %>%
     filter(lf_type == 'max') %>%
@@ -230,39 +232,108 @@ tsum <- litter %>%
     labs(x = '', y = 'Water temp during peak litterfall')
 sumsum <- ggpubr::ggarrange(qsum, tsum)
 
-met <-
-    ggplot(nhc, aes(doy)) +
+met <- ggplot(nhc, aes(doy)) +
     # geom_ribbon(aes(ymin = GPP_fill, ymax = -ER_fill),
     #             alpha = 0.2, color = NA)+
     # geom_ribbon(aes(ymax = GPP_high, ymin = -ER_fill),
     #             fill = 'white',color = NA)+
+    geom_line(aes(y = GPP), col = 'gray40', linewidth = 0.72) +
+    geom_line(aes(y = ER), col = 'gray40', linewidth = 0.72) +
     geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper),
-                col = NA, fill = alpha("GPP", 0.1))+
+                col = NA, fill = alpha(gppcol, 0.5))+
     geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper),
-                col = NA, fill = alpha("ER", 0.1))+
-    geom_line(aes(y = GPP, col = "GPP"), size = 0.72) +
-    geom_line(aes(y = ER, col = "ER"), size = 0.72) +
-    geom_segment( aes(x = hurricane, y = 4, xend = hurricane, yend = 2),
+                col = NA, fill = alpha(ercol, 0.5))+
+    geom_segment(aes(x = hurricane, y = -3, xend = hurricane, yend = -1),
                   arrow = arrow(length = unit(0.12, 'inches')),
                   linewidth = 1, col = colors[4])+
-    geom_text(aes(x = hurricane, y = 3.5, label = 'Hurricane'),
-              hjust = 0, vjust = 0, nudge_x = 2, col = colors[4])+
-    geom_hline(aes(yintercept = 0), linewidth = 0.3)+
+    geom_text(aes(x = hurricane, y = -3.5, label = 'Hurricane'),
+              vjust = 1, col = colors[4])+
+    geom_hline(aes(yintercept = 0), linewidth = 0.3, col = 'gray60')+
     geom_line(data = rename(lsum, Litterfall = lf_type),
               aes(doy, level, lty = Litterfall),
               linewidth = 1, col = colors[3])+
     facet_grid(year~., scales = 'free_x')+
     # ylim(0, 6.5)+
     labs(x = "Day of year",
-         y = "Metabolism (gC/m2/d)",
+         y = expression("Metabolism (gCm"^-2 * "d"^-1 * ")"),
+         color = "Metabolism") +
+    theme_classic() +
+    theme(legend.position = c(0.22, 0.99),
+          legend.direction = 'horizontal',
+          strip.background = element_blank(),
+          strip.text = element_blank())
+          # panel.border = element_rect(colour = "black", fill = NA, linewidth = 1))
+
+# cumulative metab plots
+
+cumulplots <- nhc %>%
+    select(date, starts_with(c('GPP', 'ER'), ignore.case = FALSE), doy) %>%
+    mutate(across(starts_with("GPP"), ~ if_else(. < 0, 0, .)),
+           across(starts_with("ER"), ~ if_else(. > 0, 0, .))) %>%
+    mutate(year = as.numeric(strftime(date, format = '%Y'))) %>%
+    group_by(year) %>%
+    mutate(across(-any_of(c('date', 'year', 'doy')), ~ na.approx(., na.rm = FALSE, rule = 2)),
+           across(-any_of(c('date', 'year', 'doy')), cumsum, .names = '{col}cumul')) %>%
+    ungroup() %>%
+    ggplot(aes(x = doy)) +
+    geom_line(aes(y = GPPcumul), col = 'gray40', linewidth = 0.72) +
+    geom_line(aes(y = ERcumul), col = 'gray40', linewidth = 0.72) +
+    geom_ribbon(aes(ymin = GPP.lowercumul, ymax = GPP.uppercumul),
+                col = NA, fill = alpha(gppcol, 0.5)) +
+    geom_ribbon(aes(ymin = ER.lowercumul, ymax = ER.uppercumul),
+                col = NA, fill = alpha(ercol, 0.5)) +
+    geom_hline(aes(yintercept = 0), linewidth = 0.3, col = 'gray60') +
+    facet_grid(year ~ ., scales = 'free_x') +
+    labs(x = "Day of year",
+         y = expression("Metabolism (gCm"^-2 * ")"),
          color = "Metabolism") +
     theme_classic() +
     theme(legend.position = 'top',
-          legend.justification = 'left')+
-    scale_color_manual(values = color_pal)
+          legend.justification = 'left',
+          panel.border = element_rect(colour = "black", fill = NA, linewidth = 1))
+ggpubr::ggarrange(met, cumulplots, p2, widths = c(2, 1, 1.2), ncol = 3)
 
+# alice_mostor_plot <- nhc %>%
+#     select(date, starts_with(c('GPP', 'ER'), ignore.case = FALSE), doy, hurricane) %>%
+#     mutate(across(starts_with("GPP"), ~ if_else(. < 0, 0, .)),
+#            across(starts_with("ER"), ~ if_else(. > 0, 0, .))) %>%
+#     mutate(year = as.numeric(strftime(date, format = '%Y'))) %>%
+#     group_by(year) %>%
+#     mutate(GPP.med.mean = GPP, ER.med.mean = ER,
+#            GPP.lower.mean = GPP.lower, ER.lower.mean = ER.upper,
+#            GPP.upper.mean = GPP.upper, ER.upper.mean = ER.lower,
+#            ER = -ER, ER.upper = -ER.upper, ER.lower = -ER.lower) %>%
+#     rename(GPP.med = GPP, ER.med = ER) %>%
+#     mutate(across(any_of(c('GPP.med', 'ER.med', 'GPP.lower', 'GPP.upper')), ~ na.approx(., na.rm = FALSE, rule = 2)),
+#            across(any_of(c('GPP.med', 'ER.med', 'GPP.lower', 'GPP.upper')), cumsum, .names = '{col}.cumul')) %>%
+#     ungroup() %>%
+#     pivot_longer(cols = ends_with(c('mean', 'cumul')),
+#                  names_to = c('met', 'stat', 'plot'),
+#                  names_sep = '\\.', values_to = 'value') %>%
+#     pivot_wider(values_from = value, names_from = stat) %>%
+#     ggplot(aes(x = doy)) +
+#     geom_line(aes(y = med, group = met), col = 'gray40', linewidth = 0.72) +
+#     geom_ribbon(aes(ymin = lower, ymax = upper, , group = met, fill = met),
+#                 col = NA, alpha = 0.5)+
+#     geom_segment(aes(x = hurricane, y = -3, xend = hurricane, yend = -1),
+#                   arrow = arrow(length = unit(0.12, 'inches')),
+#                   linewidth = 1, col = colors[4])+
+#     geom_text(aes(x = hurricane, y = -3.5, label = 'Hurricane'),
+#               vjust = 1, col = colors[4])+
+#     geom_hline(aes(yintercept = 0), linewidth = 0.3, col = 'gray60')+
+#     geom_line(data = rename(lsum, Litterfall = lf_type),
+#               aes(doy, level, lty = Litterfall),
+#               linewidth = 1, col = colors[3])+
+#     facet_grid(year~plot, scales = 'free', space = 'free')+
+#     labs(x = "Day of year",
+#          y = expression("Metabolism (gCm"^-2 * "d"^-1 * ")"),
+#          color = "Metabolism") +
+#     theme_classic() +
+#     theme(legend.position = 'top',
+#           legend.justification = c('left', 'top'))
+#
 
-# plot flow duration curves
+    # plot flow duration curves
 q_dur <- qq %>%
     select(date, discharge = NHC.Q) %>%
     mutate(year = year(date),
@@ -321,7 +392,7 @@ p3 <- ggpubr::ggarrange(sumsum, p2, heights = c(1,2), nrow = 2, align = 'h')
 
 png(filename = 'figures/NHC_3year_met.png', width = 10, height = 4.5,
     units = 'in', res = 300)
-    ggpubr::ggarrange(met, p2, widths = c(2,1.2))
+    ggpubr::ggarrange(met, cumulplots, p2, widths = c(2, 1, 1.2), ncol = 3)
 dev.off()
 
 png(filename = 'figures/NHC_qt_during_litterfall.png', width = 6, height = 3,
