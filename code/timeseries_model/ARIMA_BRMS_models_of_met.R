@@ -368,7 +368,7 @@ tiff('figures/BRMS_hindcast_comparison_daily.tiff', width = 7.5, height = 4,
 # png('figures/BRMS_hindcast_comparison_daily.png', width = 7.5, height = 4,
 #      units = 'in', res = 300)
 
-x0date <- as.Date('1968-02-28')
+x0date <- as.Date('1968-04-08')
 mplot <- ggplot(hindcast) +
     geom_ribbon(aes(x = date, ymin = ER_err_high, ymax = ER_err_low),
                 col = NA, fill = 'grey80') +
@@ -382,7 +382,7 @@ mplot <- ggplot(hindcast) +
     geom_line(aes(x = date, y = GPP, color = "AR1 Hindcast")) +
     geom_point(aes(x = date, y = ER_measured, color = "Historical Data")) +
     geom_point(aes(x = date, y = GPP_measured, color = "Historical Data")) +
-    geom_hline(yintercept = 0) +
+    geom_hline(yintercept = 0, linewidth = 0.3, linetype = 'dashed') +
     ylab(expression(paste('Metabolism (g ', O[2], m^-2, d^-1, ')'))) +
     xlab('Date')+
     theme_classic() +
@@ -395,9 +395,11 @@ mplot <- ggplot(hindcast) +
                                 ncol = 2)) +
     theme(
         legend.background = element_rect(fill = 'transparent'),
-        legend.position = c(0.02, 0.93),
+        legend.position = c(0.02, 0.98),
         legend.justification = c(0, 1),
         legend.title = element_blank(),
+        # legend.box.background = element_rect(color = "black", linewidth = 0.2),
+        legend.text = element_text(margin = margin(r = -5, unit = "pt")),
         axis.text.x = element_blank(),
         axis.ticks.x = element_blank(),
         axis.title.x = element_blank(),
@@ -411,19 +413,21 @@ mplot <- ggplot(hindcast) +
                        oob = scales::squish_infinite) +
     geom_segment(x = x0date, xend = x0date, y = -6.2, yend = 2.8,
                  color = "gray25", linewidth = 0.2) +
-    coord_cartesian(clip = "off")
+    coord_cartesian(clip = "off") +
+    scale_x_date(expand = c(0, 0))
 
 
 qplot <- ggplot(hindcast) +
     # geom_line(aes(x = date, y = discharge_m3s, color = "Discharge")) +
     geom_line(aes(x = date, y = discharge_m3s), color = "darkblue") +
-    ylab('Discharge (cms)') +
+    ylab(expression('Discharge (m'^3 * 's'^-1 * ')')) +
     xlab('Date') +
     theme_classic() +
     theme(axis.line.y.left = element_line(color = "black", linewidth = 0.2),
           axis.line.x.bottom = element_line(color = "black", linewidth = 0.2),
           panel.border = element_blank(),
-          plot.margin = margin(t = 0))
+          plot.margin = margin(t = 0)) +
+    scale_x_date(expand = c(0, 0))
     # scale_color_manual(
     #     values = c("Discharge" = "darkblue")
     # )
@@ -446,7 +450,8 @@ dev.off()
 
 png('figures/BRMS_hindcast_comparison_daily.png', width = 7.5, height = 4,
      units = 'in', res = 300)
-ggpubr::ggarrange(mplot, qplot, heights = c(3, 1), ncol = 1, align = 'v')
+ggpubr::ggarrange(mplot, qplot, heights = c(3, 1), ncol = 1, align = 'v') +
+    theme(plot.margin = margin(r = 2))
     # annotate("text", x = 0.09, y = 0.85, label = "A") +
     # annotate("text", x = 0.56, y = 0.85, label = "B")
 dev.off()

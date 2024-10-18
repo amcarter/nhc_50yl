@@ -3,7 +3,7 @@
 library(ks)
 library(zoo)
 library(tidyverse)
-library(streamMetabolizer)
+# library(streamMetabolizer)
 #setwd('C:/Users/Alice Carter/Dropbox (Duke Bio_Ea)/projects/NHC_2019_metabolism/data')
 
 # Cleaning and summarizing ####
