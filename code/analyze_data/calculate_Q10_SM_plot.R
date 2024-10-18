@@ -435,12 +435,52 @@ ggplot( aes(log10(discharge_mean), ER, group = year,
                                    col = factor(year)),
             hjust = 0.5, vjust = 0.5, size = 3) +
   theme_bw()+
-  ylab("") +
+  ylab(expression(paste("Discharge (", m^3,"/s)"))) +
   # ylab(expression(paste("Ecosystem Respiration (g ", O[2], m^-2, d^-1, ")"))) +
   xlab(expression(paste("Median Fall Discharge (", m^3, s^-1, ")"))) +
   scale_x_continuous(breaks=c(-2,-1,0),
                      labels=c(0.01, 0.1, 1)) +
   theme(legend.position = 'none')
+
+
+q_dur <- nhc_fall1 %>%
+    select(date, discharge) %>%
+    mutate(year = year(date)) %>%
+    #        discharge = case_when(discharge > 100 ~ NA_real_,
+    #                              TRUE ~ discharge)) %>%
+    # filter(year > 2016 & year < 2020)%>%
+    arrange(year, discharge) %>%
+    mutate(index = NA_real_)
+
+for(y in unique(q_dur$year)){
+    n = nrow(filter(q_dur, year == y))
+    q_dur$index[q_dur$year == y] <- seq(100, 0, length.out = n)
+}
+
+fd <- q_dur %>%
+    mutate(Year = factor(year))%>%
+    ggplot(aes(index, discharge)) +
+    geom_line(aes(col = Year)) +
+    theme_classic() +
+    scale_y_log10()+
+    labs(x = 'Exceedence Frequency',
+         y = expression(paste("Discharge (", m^3,"/s)"))) +
+    geom_text(aes(x = 85, y = 0.015), label = "2017", col = '#F8766D', size = 3)+
+    geom_text(aes(x = 82, y = 0.75), label = "2018", col = '#00BA38', size = 3)+
+    geom_text(aes(x = 83, y = 0.1), label = "2019", col = '#619CFF', size = 3)+
+    theme(legend.position = 'none')
+hyd <- nhc_fall1 %>%
+    mutate(Year = factor(year))%>%
+    ggplot(aes(doy, discharge)) +
+    geom_line(aes(col = Year)) +
+    theme_classic() +
+    scale_y_log10()+
+    labs(x = 'Day of year',
+         y = expression(paste("Discharge (", m^3,"/s)"))) +
+    geom_text(aes(x = 277, y = 0.01), label = "2017", col = '#F8766D', size = 3)+
+    geom_text(aes(x = 277, y = 0.75), label = "2018", col = '#00BA38', size = 3)+
+    geom_text(aes(x = 277, y = 0.05), label = "2019", col = '#619CFF', size = 3)+
+    theme(legend.position = 'none')
 
 tt <- ggplot(nhc_fall1, aes(temp.water, ER)) +
   geom_point(size = 1.2) +
@@ -458,12 +498,24 @@ tt <- ggplot(nhc_fall1, aes(temp.water, ER)) +
 
 # tiff(filename = "figures/NEP_drivers_autumn_across_years.tif",
 #      compression = 'lzw', width = 6, height = 3, res = 300, units = 'in')
-png(filename = "figures/NEP_drivers_autumn_across_years.png",
+png(filename = "figures/NEP_drivers_autumn_across_years1.png",
      width = 6, height = 3, res = 300, units = 'in')
   ggpubr::ggarrange(tt, qq,  labels = c("a","b"),
                     align = 'h', vjust = 3.5, label.y = 1.08)
-
 dev.off()
+
+png(filename = "figures/NEP_drivers_autumn_across_years2.png",
+     width = 6, height = 3, res = 300, units = 'in')
+  ggpubr::ggarrange(tt, fd,  labels = c("a","b"),
+                    align = 'h', vjust = 3.5, label.y = 1.08)
+dev.off()
+
+png(filename = "figures/NEP_drivers_autumn_across_years3.png",
+     width = 6, height = 3, res = 300, units = 'in')
+  ggpubr::ggarrange(tt, hyd,  labels = c("a","b"),
+                    align = 'h', vjust = 3.5, label.y = 1.08)
+dev.off()
+
 
 
   nhc_spring <- nhc_fall %>% filter(month %in% c(3,4,5))

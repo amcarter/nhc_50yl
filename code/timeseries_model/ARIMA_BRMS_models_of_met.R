@@ -13,11 +13,19 @@ sites <- read_csv('data/siteData/NHCsite_metadata.csv') %>%
 # load in Hall dataset:
 
 hall <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_O2.rds")
-hall <- hall$preds %>% filter(era == 'then', site == 'CBP')
-hall_QT <- read_csv('data/hall_data/hall_discharge_temp_daily.csv')
+hall <- hall$preds %>% filter(era == 'then', site == 'CBP') %>%
+    select(date, site, year, doy, temp.water, starts_with(c('GPP', 'ER'))) %>%
+    select(-era) %>%
+    group_by(date, site) %>%
+    summarize(across(everything(), ~mean(.x, na.rm = T)))
+hall_QT <- read_csv('data/hall_data/hall_discharge_temp_daily.csv') %>%
+    group_by(date) %>%
+    summarize(across(c('water_temp_C', 'discharge_m3s'),
+                     ~mean(.x, na.rm = T)))
 
 # historical air temperature trend:
-airtemp <- read_csv('data/gee/historical_air_temperature.csv')
+airtemp <- read_csv('data/watershed/noaa_air_temp.csv') %>%
+    rename(temp_C = temp_mean)
 
 P <- dat %>%
   select(date, site,ER,  GPP, GPP.lower, GPP.upper, discharge,
@@ -51,8 +59,8 @@ P_scaled <- P %>%
            CBP = case_when(site == 'CBP' ~ 1,
                            TRUE ~ 0)) %>%
     slice(-c(1, 362:386, 1506)) # remove leading and ending NA's in metabolism from each site
-plot(density(log(P_scaled$GPP), na.rm = T))
-plot(density(log(-P_scaled$ER), na.rm = T))
+# plot(density(log(P_scaled$GPP), na.rm = T))
+# plot(density(log(-P_scaled$ER), na.rm = T))
 
 P$light_smooth <- (zoo::rollmean(P$light, k = 7, fill = NA))
 # add light data to hall:
@@ -100,14 +108,17 @@ GPP_priors <- c(prior("normal(0,5)", class = "b"),
                 prior("normal(0,5)", class = "Intercept"),
                 prior("cauchy(0,1)", class = "sigma"))
 
-bmod_GPP <- brm(bform_GPP,
-                data = P_scaled,
-                chains = 4, cores = 4, iter = 2000,
-                prior = GPP_priors,
-                control = list(adapt_delta = 0.99,
-                               max_treedepth = 12) )
+# bmod_GPP <- brm(bform_GPP,
+#                 data = P_scaled,
+#                 chains = 4, cores = 4, iter = 4000,
+#                 prior = GPP_priors,
+#                 control = list(adapt_delta = 0.99,
+#                                max_treedepth = 14) )
 
 # evaluate model fit:
+# saveRDS(bmod_GPP, 'data/timeseries_model_fits/brms_GPP_mod.rds')
+bmod_GPP <- readRDS('data/timeseries_model_fits/brms_GPP_mod.rds')
+
 summary(bmod_GPP)
 
 png('figures/SI/BRMS_gpp_posterior_pred_check.png', width = 5, height = 4,
@@ -181,24 +192,24 @@ hindcast_GPP <- data.frame(
            GPP_err_low = exp(GPP_err_low)- epsilon,
            GPP_err_high = exp(GPP_err_high - epsilon))
 
-ggplot(hindcast_GPP, aes(date, GPP), col = 2) +
-    geom_ribbon(aes(ymin = GPP_err_low, ymax = GPP_err_high),
-                col = NA, fill = 'grey80') +
-    geom_ribbon(aes(ymin = GPP_low, ymax = GPP_high),
-                col = NA, fill = 'grey50') +
-    geom_line() +
-    geom_point(data = hall,  col = 2)
+# ggplot(hindcast_GPP, aes(date, GPP), col = 2) +
+#     geom_ribbon(aes(ymin = GPP_err_low, ymax = GPP_err_high),
+#                 col = NA, fill = 'grey80') +
+#     geom_ribbon(aes(ymin = GPP_low, ymax = GPP_high),
+#                 col = NA, fill = 'grey50') +
+#     geom_line() +
+#     geom_point(data = hall,  col = 2)
+#
+# plot(hindcast_GPP$date, hindcast_GPP$GPP, type = 'l', ylim = c(0,10))
+# for(s in sample(draws, 100)){
+#     lines(hindcast_GPP$date, exp(post_preds[s,])-epsilon, col = alpha('grey', 0.3))
+# }
+#
+# lines(hindcast_GPP$date, hindcast_GPP$GPP)
+# points(hall$date, hall$GPP, col = 2, pch = 20)
 
 
-
-plot(hindcast_GPP$date, hindcast_GPP$GPP, type = 'l', ylim = c(0,10))
-for(s in sample(draws, 100)){
-    lines(hindcast_GPP$date, exp(post_preds[s,])-epsilon, col = alpha('grey', 0.3))
-}
-
-lines(hindcast_GPP$date, hindcast_GPP$GPP)
-points(hall$date, hall$GPP, col = 2, pch = 20)
-# model for ER
+############## model for ER
 
 bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water + light + log_Q)
 get_prior(bform_ER, data = P_scaled)
@@ -206,13 +217,15 @@ ER_priors <- c(prior("normal(0,5)", class = "b"),
                prior("normal(0,5)", class = "Intercept"),
                prior("cauchy(0,1)", class = "sigma"),
                prior("beta(1,1)", class = "ar", lb = 0, ub = 1))
-bmod_ER <- brm(bform_ER,
-               data = P_scaled,
-               prior = ER_priors,
-               chains = 4, cores = 4, iter = 2000,
-               control = list(adapt_delta = 0.99,
-                              max_treedepth = 12))
-
+# bmod_ER <- brm(bform_ER,
+#                data = P_scaled,
+#                prior = ER_priors,
+#                chains = 4, cores = 4, iter = 4000,
+#                control = list(adapt_delta = 0.99,
+#                               max_treedepth = 12))
+#
+# saveRDS(bmod_ER, 'data/timeseries_model_fits/brms_ER_mod.rds')
+bmod_ER <- readRDS('data/timeseries_model_fits/brms_ER_mod.rds')
 
 summary(bmod_ER)
 
@@ -317,22 +330,22 @@ hindcast_ER <- data.frame(
 
 
 
-plot(hindcast_ER$date, hindcast_ER$ER, type = 'l', ylim = c(-20,0))
-for(s in sample(draws, 100)){
-    lines(hindcast_ER$date, -exp(post_preds_ER[s,]) + epsilon,alpha = 0.1)
-}
+# plot(hindcast_ER$date, hindcast_ER$ER, type = 'l', ylim = c(-20,0))
+# for(s in sample(draws, 100)){
+#     lines(hindcast_ER$date, -exp(post_preds_ER[s,]) + epsilon,alpha = 0.1)
+# }
+#
+# lines(hindcast_ER$date, hindcast_ER$ER)
+# points(hall$date, hall$ER, col = 2, pch = 20)
 
-lines(hindcast_ER$date, hindcast_ER$ER)
-points(hall$date, hall$ER, col = 2, pch = 20)
 
-
-ggplot(hindcast_ER, aes(date, ER), col = 2) +
-    geom_ribbon(aes(ymin = ER_err_low, ymax = ER_err_high),
-                col = NA, fill = 'grey80') +
-    geom_ribbon(aes(ymin = ER_low, ymax = ER_high),
-                col = NA, fill = 'grey50') +
-    geom_line() +
-    geom_point(data = hall,  col = 2)
+# ggplot(hindcast_ER, aes(date, ER), col = 2) +
+#     geom_ribbon(aes(ymin = ER_err_low, ymax = ER_err_high),
+#                 col = NA, fill = 'grey80') +
+#     geom_ribbon(aes(ymin = ER_low, ymax = ER_high),
+#                 col = NA, fill = 'grey50') +
+#     geom_line() +
+#     geom_point(data = hall,  col = 2)
 
 hindcast <- full_join(hindcast_GPP, hindcast_ER, by = 'date')
 
@@ -343,7 +356,7 @@ hindcast <- hall %>%
     right_join(hindcast, by = 'date')
 
 bind_rows(GPP_pars, ER_pars) %>%
-    write_csv('data/BRMS_hindcast_models_coefficients.csv')
+    write_csv('data/timeseries_model_fits/BRMS_hindcast_models_coefficients.csv')
 
 ################################################################################
 # Make Figures:
@@ -584,14 +597,30 @@ hindcast <- data.frame(
 
 
 library(viridis)
+tiff('figures/change_in_annual_met_preds_through_time.tiff',
+     width = 5, height = 4, res = 300, units = 'in')
 hindcast %>%
-    ggplot(aes(doy, GPP, col = year)) +
-    geom_line() %>%
-    scale_color_viridis(name = 'Year', option = 'C')
-    scale_color_manual(values = viridis::viridis(6))
+    mutate(GPP = zoo::rollmean(GPP, k = 7, na.pad = TRUE)) %>%
+    mutate(ER = -zoo::rollmean(ER, k = 7, na.pad = TRUE)) %>%
+    group_by(doy) %>%
+    mutate(GPP = zoo::rollmean(GPP, k = 5, na.pad = TRUE)) %>%
+    mutate(ER = zoo::rollmean(ER, k = 5, na.pad = TRUE)) %>%
+    pivot_longer(cols = c('GPP', 'ER'),
+                 names_to = 'met',
+                 values_to = 'gO2') %>%
+    filter(year %% 5 == 2) %>%
+    mutate(met = factor(met, levels = c('GPP', 'ER'))) %>%
+    ggplot(aes(doy, gO2, col = year, group = factor(year))) +
+    geom_line(linewidth = 0.7) +
+    # geom_line(aes(y = -ER), linewidth = 1) +
+    scale_color_viridis(name = 'Year', option = 'C', begin = 0, end = 0.9) +
+    facet_wrap(.~met, scales = 'free_y', ncol = 1, strip.position = 'right')+
+    ylab(expression(paste('Metabolism (g ', O[2], m^-2, y^-1, ')'))) +
+    xlab('Day of year') +
+    theme_bw()
+dev.off()
 
-
-tiff('figures/Annual_hindcast_trajectory.tiff', width = 5, height = 4,
+tiff('figures/Annual_hindcast_trajectory.tiff', width = 4, height = 3,
      units = 'in', res = 300)
 
 hindcast %>%
@@ -612,13 +641,15 @@ hindcast %>%
     mutate(met = factor(met, levels = c('GPP', 'ER'))) %>%
     ggplot(aes(year, mean))+
     geom_ribbon(aes(ymin = low,
-                    ymax = high),
-                col = 'grey', fill = 'grey') +
+                    ymax = high, fill = met),
+                col = NA, alpha = 0.5) +
     geom_line() +
-    facet_wrap(.~met, ncol = 1, scales = 'free', strip.position = 'right')+
-    ylab(expression(paste('Metabolism (g ', O[2], m^-2, y^-1, ')'))) +
+    scale_fill_manual(name = '', values = c("#3b7c70", "#ce9642"))+
+    facet_wrap(.~met, ncol = 1, scales = 'free_y', strip.position = 'right')+
+    ylab(expression(paste('Annual Metabolism (g ', O[2], m^-2, y^-1, ')'))) +
     xlab('Year') +
-    theme_bw()
+    theme_bw() +
+    theme(legend.position = 'none')
 
 dev.off()
 
