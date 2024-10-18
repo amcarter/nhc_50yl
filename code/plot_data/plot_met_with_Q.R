@@ -253,15 +253,16 @@ met <- ggplot(nhc, aes(doy)) +
               aes(doy, level, lty = Litterfall),
               linewidth = 1, col = colors[3])+
     facet_grid(year~., scales = 'free_x')+
-    # ylim(0, 6.5)+
     labs(x = "Day of year",
          y = expression("Metabolism (gCm"^-2 * "d"^-1 * ")"),
          color = "Metabolism") +
     theme_classic() +
-    theme(legend.position = c(0.22, 0.99),
-          legend.direction = 'horizontal',
-          strip.background = element_blank(),
-          strip.text = element_blank())
+    theme(legend.position = 'top',
+          legend.justification = 'center')
+    # theme(legend.position = c(0.22, 0.99),
+    #       legend.direction = 'horizontal',
+    #       strip.background = element_blank(),
+    #       strip.text = element_blank())
           # panel.border = element_rect(colour = "black", fill = NA, linewidth = 1))
 
 # cumulative metab plots
@@ -278,20 +279,65 @@ cumulplots <- nhc %>%
     ggplot(aes(x = doy)) +
     geom_line(aes(y = GPPcumul), col = 'gray40', linewidth = 0.72) +
     geom_line(aes(y = ERcumul), col = 'gray40', linewidth = 0.72) +
-    geom_ribbon(aes(ymin = GPP.lowercumul, ymax = GPP.uppercumul),
-                col = NA, fill = alpha(gppcol, 0.5)) +
-    geom_ribbon(aes(ymin = ER.lowercumul, ymax = ER.uppercumul),
-                col = NA, fill = alpha(ercol, 0.5)) +
+    # geom_line(aes(y = GPPcumul, col = 'GPP'), linewidth = 0.72) +
+    # geom_line(aes(y = ERcumul, col = 'ER'), linewidth = 0.72) +
+    # geom_ribbon(aes(ymin = GPP.lowercumul, ymax = GPP.uppercumul),
+    #             col = NA, fill = alpha(gppcol, 0.5)) +
+    # geom_ribbon(aes(ymin = ER.lowercumul, ymax = ER.uppercumul),
+    #             col = NA, fill = alpha(ercol, 0.5)) +
+    geom_ribbon(aes(ymin = GPP.lowercumul, ymax = GPP.uppercumul, fill = 'GPP'),
+                col = NA, alpha = 0.5) +
+    geom_ribbon(aes(ymin = ER.lowercumul, ymax = ER.uppercumul, fill = 'ER'),
+                col = NA, alpha = 0.5) +
     geom_hline(aes(yintercept = 0), linewidth = 0.3, col = 'gray60') +
     facet_grid(year ~ ., scales = 'free_x') +
     labs(x = "Day of year",
-         y = expression("Metabolism (gCm"^-2 * ")"),
-         color = "Metabolism") +
+         y = expression("Cumul. Metabolism (gCm"^-2 * ")"),
+         fill = "Metabolism") +
+    scale_fill_manual(values = c("GPP" = gppcol, "ER" = ercol)) +
+    # scale_color_manual(values = c("GPP" = 'gray40', "ER" = 'gray40'),
+    #                    name = '') +
     theme_classic() +
     theme(legend.position = 'top',
           legend.justification = 'left',
-          panel.border = element_rect(colour = "black", fill = NA, linewidth = 1))
-ggpubr::ggarrange(met, cumulplots, p2, widths = c(2, 1, 1.2), ncol = 3)
+          legend.box.margin = margin(0, 0, 0, -120))
+    # guides(
+    #     fill = guide_legend(theme = theme(legend.position = 'top',
+    #                                       legend.justification = 'left',
+    #                                       legend.box.margin = margin(0, 0, 0, -120))),
+    #     color = guide_legend(theme = theme(legend.position = 'top',
+    #                                       legend.justification = 'left',
+    #                                       legend.box.margin = margin(0, 0, 0, -120)))
+    # )
+
+png(filename = 'figures/NHC_3year_met.png', width = 10, height = 4.5,
+    units = 'in', res = 300)
+ggpubr::ggarrange(met, cumulplots, p2, widths = c(2, 1, 1.2), ncol = 3) +
+    annotate("text", x = 0.09, y = 0.85, label = "A") +
+    annotate("text", x = 0.56, y = 0.85, label = "B") +
+    annotate("text", x = 0.97, y = 0.85, label = "C")
+dev.off()
+
+# library(gtable)
+# library(grid)
+# g <- ggplotGrob(cumulplots)
+# panel_indices <- grep("^panel", g$layout$name)
+# panel_layout <- g$layout[panel_indices, ]
+# panels_to_box <- g$layout$name %in% c("panel-1-1", "panel-1-2")
+# panels_positions <- g$layout[panels_to_box, ]
+# top <- min(panels_positions$t)
+# left <- min(panels_positions$l)
+# bottom <- max(panels_positions$b)
+# right <- max(panels_positions$r)
+# rect <- rectGrob(
+#     gp = gpar(lwd = 2, col = "red", fill = NA)
+# )
+# g <- gtable_add_grob(
+#     g, rect, t = top, l = left, b = bottom, r = right, z = Inf, name = "rect"
+# )
+# grid.newpage()
+# grid.draw(g)
+
 
 # alice_mostor_plot <- nhc %>%
 #     select(date, starts_with(c('GPP', 'ER'), ignore.case = FALSE), doy, hurricane) %>%
@@ -360,7 +406,6 @@ for(y in unique(t_dur$year)){
     t_dur$index[t_dur$year == y] <- seq(100, 0, length.out = n)
 }
 
-
 fd <- q_dur %>%
     mutate(Year = factor(year))%>%
 ggplot(aes(index, discharge)) +
@@ -368,22 +413,23 @@ ggplot(aes(index, discharge)) +
     theme_classic() +
     scale_y_log10()+
     labs(x = 'Exceedence Frequency',
-         y = 'Discharge (m3/s)')
+         y = expression('Discharge (m'^3 * 's'^-1 * ')'))
+
 td <- t_dur %>%
     mutate(Year = factor(year))%>%
 ggplot(aes(index, temp.water)) +
     geom_line(aes(lty = Year)) +
     theme_classic() +
     labs(x = 'Exceedence Frequency',
-         y = 'Water Temparature (C)')
-# fd <-
+         y = 'Water Temparature (°C)')
+
 wt <- nhc %>%
     mutate(Year = factor(year))%>%
 ggplot(aes(doy, temp.water)) +
     geom_line(aes(lty = Year)) +
     theme_classic() +
     labs(x = 'Day',
-         y = 'Water Temperature (C)')
+         y = 'Water Temperature (°C)')
 
 
 p2 <- ggpubr::ggarrange(fd, wt, common.legend = TRUE, nrow = 2)
@@ -393,6 +439,8 @@ p3 <- ggpubr::ggarrange(sumsum, p2, heights = c(1,2), nrow = 2, align = 'h')
 png(filename = 'figures/NHC_3year_met.png', width = 10, height = 4.5,
     units = 'in', res = 300)
     ggpubr::ggarrange(met, cumulplots, p2, widths = c(2, 1, 1.2), ncol = 3)
+        # annotate("rect", xmin = 0, xmax = 0., ymin = 0.7, ymax = 1,
+        #          fill = "transparent", linewidth = 0.5, colour = 'black')
 dev.off()
 
 png(filename = 'figures/NHC_qt_during_litterfall.png', width = 6, height = 3,
