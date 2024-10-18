@@ -368,7 +368,8 @@ tiff('figures/BRMS_hindcast_comparison_daily.tiff', width = 7.5, height = 4,
 # png('figures/BRMS_hindcast_comparison_daily.png', width = 7.5, height = 4,
 #      units = 'in', res = 300)
 
-ggplot(hindcast) +
+x0date <- as.Date('1968-02-28')
+mplot <- ggplot(hindcast) +
     geom_ribbon(aes(x = date, ymin = ER_err_high, ymax = ER_err_low),
                 col = NA, fill = 'grey80') +
     geom_ribbon(aes(x = date, ymin = ER_high, ymax = ER_low),
@@ -384,7 +385,7 @@ ggplot(hindcast) +
     geom_hline(yintercept = 0) +
     ylab(expression(paste('Metabolism (g ', O[2], m^-2, d^-1, ')'))) +
     xlab('Date')+
-    theme_bw() +
+    theme_classic() +
     # Custom legend
     scale_color_manual(
         values = c("AR1 Hindcast" = "black", "Historical Data" = "brown3")
@@ -394,10 +395,60 @@ ggplot(hindcast) +
                                 ncol = 2)) +
     theme(
         legend.background = element_rect(fill = 'transparent'),
-        legend.position = c(0.02, 0.13), # Upper-left inside the plot
+        legend.position = c(0.02, 0.93),
         legend.justification = c(0, 1),
         legend.title = element_blank(),
-    )
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank(),
+        panel.border = element_blank(),
+        axis.line.y.left = element_blank(),
+        # axis.line.y.left = element_line(color = "black", linewidth = 0.2),
+        axis.line.x.bottom = element_blank(),
+        plot.margin = margin(b = 0)
+    ) +
+    scale_y_continuous(limits = c(-4.5, 1.6), expand = c(0.39, 0),
+                       oob = scales::squish_infinite) +
+    geom_segment(x = x0date, xend = x0date, y = -6.2, yend = 2.8,
+                 color = "gray25", linewidth = 0.2) +
+    coord_cartesian(clip = "off")
+
+
+qplot <- ggplot(hindcast) +
+    # geom_line(aes(x = date, y = discharge_m3s, color = "Discharge")) +
+    geom_line(aes(x = date, y = discharge_m3s), color = "darkblue") +
+    ylab('Discharge (cms)') +
+    xlab('Date') +
+    theme_classic() +
+    theme(axis.line.y.left = element_line(color = "black", linewidth = 0.2),
+          axis.line.x.bottom = element_line(color = "black", linewidth = 0.2),
+          panel.border = element_blank(),
+          plot.margin = margin(t = 0))
+    # scale_color_manual(
+    #     values = c("Discharge" = "darkblue")
+    # )
+    # guides(color = guide_legend(override.aes = list(shape = c(NA, 16),
+    #                                                 linetype = c(1, 0)),
+    #                             ncol = 2)) +
+    # theme(
+    #     legend.background = element_blank(),
+    #     legend.position = c(0.02, 0.95), # Upper-left inside the plot
+    #     legend.justification = c(0, 1),
+    #     legend.title = element_blank(),
+    # )
+
+tiff('figures/BRMS_hindcast_comparison_daily.tiff', width = 7.5, height = 4,
+     units = 'in', res = 300)
+ggpubr::ggarrange(mplot, qplot, heights = c(3, 1), ncol = 1, align = 'v')
+    # annotate("text", x = 0.09, y = 0.85, label = "A") +
+    # annotate("text", x = 0.56, y = 0.85, label = "B")
+dev.off()
+
+png('figures/BRMS_hindcast_comparison_daily.png', width = 7.5, height = 4,
+     units = 'in', res = 300)
+ggpubr::ggarrange(mplot, qplot, heights = c(3, 1), ncol = 1, align = 'v')
+    # annotate("text", x = 0.09, y = 0.85, label = "A") +
+    # annotate("text", x = 0.56, y = 0.85, label = "B")
 dev.off()
 
 

@@ -310,14 +310,6 @@ cumulplots <- nhc %>%
     #                                       legend.box.margin = margin(0, 0, 0, -120)))
     # )
 
-png(filename = 'figures/NHC_3year_met.png', width = 10, height = 4.5,
-    units = 'in', res = 300)
-ggpubr::ggarrange(met, cumulplots, p2, widths = c(2, 1, 1.2), ncol = 3) +
-    annotate("text", x = 0.09, y = 0.85, label = "A") +
-    annotate("text", x = 0.56, y = 0.85, label = "B") +
-    annotate("text", x = 0.97, y = 0.85, label = "C")
-dev.off()
-
 # library(gtable)
 # library(grid)
 # g <- ggplotGrob(cumulplots)
@@ -438,9 +430,10 @@ p3 <- ggpubr::ggarrange(sumsum, p2, heights = c(1,2), nrow = 2, align = 'h')
 
 png(filename = 'figures/NHC_3year_met.png', width = 10, height = 4.5,
     units = 'in', res = 300)
-    ggpubr::ggarrange(met, cumulplots, p2, widths = c(2, 1, 1.2), ncol = 3)
-        # annotate("rect", xmin = 0, xmax = 0., ymin = 0.7, ymax = 1,
-        #          fill = "transparent", linewidth = 0.5, colour = 'black')
+    ggpubr::ggarrange(met, cumulplots, p2, widths = c(2, 1, 1.2), ncol = 3) +
+        annotate("text", x = 0.09, y = 0.85, label = "A") +
+        annotate("text", x = 0.56, y = 0.85, label = "B") +
+        annotate("text", x = 0.97, y = 0.85, label = "C")
 dev.off()
 
 png(filename = 'figures/NHC_qt_during_litterfall.png', width = 6, height = 3,
