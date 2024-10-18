@@ -6,6 +6,7 @@ library(tidyverse)
 library(nlme)
 library(mgcv)
 library(brms)
+library(forecast)
 
 # load in the modern dataset:
 dat <- read_csv("data/metabolism/compiled/metabolism_and_drivers.csv")
@@ -36,31 +37,68 @@ scaling_pars <- P %>%
 
 
 min_Q = min(P$discharge[P$site == 'CBP'], na.rm = T)
-epsilon = 1e-4
+epsilon = 1e-1
 
+# P_scaled <- P %>%
+#     mutate(across(c('log_Q', 'light', 'temp.water'),
+#                   .fns = \(x) as.vector(scale(x))),
+#            sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
+#            cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
+#            month = month(date),
+#            season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
+#                               month %in% c(3, 4, 5) ~ 'Spring',
+#                               month %in% c(6, 7, 8) ~ 'Summer',
+#                               month %in% c(9, 10, 11) ~ 'Fall'),
+#            GPP = GPP + epsilon,
+#            ER = -ER + epsilon,
+#            GPP_pred = log(GPP),
+#            site = factor(site, levels = c("CBP", "NHC")))
 P_scaled <- P %>%
+    ungroup() %>%
     mutate(across(c('log_Q', 'light', 'temp.water'),
                   .fns = \(x) as.vector(scale(x))),
-           sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
-           cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
-           month = month(date),
-           season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
-                              month %in% c(3, 4, 5) ~ 'Spring',
-                              month %in% c(6, 7, 8) ~ 'Summer',
-                              month %in% c(9, 10, 11) ~ 'Fall'),
            GPP = GPP + epsilon,
            ER = -ER + epsilon,
            GPP_pred = log(GPP),
-           site = factor(site, levels = c("CBP", "NHC")))
+           site = factor(site, levels = c("CBP", "NHC")),
+           CBP = case_when(site == 'CBP' ~ 1,
+                           TRUE ~ 0)) %>%
+    slice(-c(1, 362:386, 1506)) # remove leading and ending NA's in metabolism from each site
+plot(density(log(P_scaled$GPP), na.rm = T))
+plot(density(log(-P_scaled$ER), na.rm = T))
 
+P$light_smooth <- (zoo::rollmean(P$light, k = 7, fill = NA))
 # add light data to hall:
 light <- P %>%
+    filter(site == 'NHC') %>%
     mutate(doy = format(date, '%j')) %>%
-    dplyr::select(doy, light) %>%
+    dplyr::select(doy, light_smooth) %>%
     group_by(doy) %>%
-    summarize(light = mean(light, na.rm = T))
+    summarize(light = mean(light_smooth, na.rm = T))
+plot(light)
 
-# add light to Hall daatset and scale
+
+# add light to Hall datset and scale
+# hall_preds <- hall_QT %>%
+#     mutate(doy = format(date, '%j'),
+#            # don't allow discharge to be less than 50% of the minimum we observed at the same site
+#            discharge_m3s = case_when(discharge_m3s < 0.5*min_Q ~ 0.5 * min_Q,
+#                                      TRUE ~ discharge_m3s)) %>%
+#     left_join(light, by = 'doy') %>%
+#     mutate(site = 'CBP', log_Q = log(discharge_m3s)) %>%
+#     dplyr::select(date, site,  temp.water = water_temp_C, log_Q, light) %>%
+#     mutate(across(c('log_Q', 'light', 'temp.water'),
+#                   .fns = \(x) zoo::na.approx(x, na.rm = F)),
+#            sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
+#            cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
+#            month = month(date),
+#            season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
+#                               month %in% c(3, 4, 5) ~ 'Spring',
+#                               month %in% c(6, 7, 8) ~ 'Summer',
+#                               month %in% c(9, 10, 11) ~ 'Fall'),
+#            site = factor(site, levels = c("CBP", "NHC"))) %>%
+#     slice_head(n = -4)
+
 hall_preds <- hall_QT %>%
     mutate(doy = format(date, '%j'),
            # don't allow discharge to be less than 50% of the minimum we observed at the same site
@@ -71,20 +109,225 @@ hall_preds <- hall_QT %>%
     dplyr::select(date, site,  temp.water = water_temp_C, log_Q, light) %>%
     mutate(across(c('log_Q', 'light', 'temp.water'),
                   .fns = \(x) zoo::na.approx(x, na.rm = F)),
-           sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
-           cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
-           month = month(date),
-           season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
-                              month %in% c(3, 4, 5) ~ 'Spring',
-                              month %in% c(6, 7, 8) ~ 'Summer',
-                              month %in% c(9, 10, 11) ~ 'Fall'),
            site = factor(site, levels = c("CBP", "NHC"))) %>%
     slice_head(n = -4)
+
 
 hall_scaled <- hall_preds %>%
     mutate(log_Q = (log_Q - scaling_pars$log_Q_mean)/scaling_pars$log_Q_sd,
            light = (light - scaling_pars$light_mean)/scaling_pars$light_sd,
            temp.water = (temp.water - scaling_pars$temp.water_mean)/scaling_pars$temp.water_sd)
+
+
+# fit the model using an AR1 from the forecast package:
+for_mod <- forecast::Arima(y = log(P_scaled$GPP),
+                           order = c(1,0,0),
+                           xreg = matrix(c(P_scaled$temp.water,
+                                           P_scaled$light,
+                                           P_scaled$CBP),
+                                         nrow = nrow(P_scaled), ncol = 3))
+
+# Predict the fitted values
+GPP_preds <- predict(for_mod, n_ahead = nrow(hall_scaled),
+                     newxreg = matrix(c(hall_scaled$temp.water,
+                                        hall_scaled$light,
+                                        hall_scaled$CBP),
+                                      nrow = nrow(hall_scaled), ncol = 3),
+                     se.fit = TRUE)
+
+
+hall_scaled$GPP_pred <- GPP_preds$pred
+hall_scaled$GPP = exp(hall_scaled$GPP_pred) - epsilon
+
+# plot the predictions
+ggplot(hall_scaled, aes(date, GPP))+
+    geom_point() + geom_line() +
+    geom_point(data = hall, col = 2)
+
+
+# model for ER:
+
+for_mod_ER <- forecast::Arima(y = log(P_scaled$ER),
+                              order = c(1,0,0),
+                              xreg = matrix(c(P_scaled$light,
+                                              P_scaled$temp.water,
+                                              P_scaled$log_Q,
+                                              P_scaled$CBP),
+                                            nrow = nrow(P_scaled),
+                                            ncol = 4))
+ER_preds <- predict(for_mod_ER, n.ahead = nrow(hall_scaled),
+                    newxreg = matrix(c(hall_scaled$light,
+                                       hall_scaled$temp.water,
+                                       hall_scaled$log_Q,
+                                       hall_scaled$CBP),
+                                     nrow = nrow(hall_scaled),
+                                     ncol = 4))
+
+hall_scaled$ER_pred <- ER_preds$pred
+hall_scaled$ER <- -(exp(hall_scaled$ER_pred) - epsilon)
+
+
+# save the model coefficients:
+checkresiduals(for_mod)
+summary_fit <- tidy(for_mod) %>%
+    bind_rows(data.frame(term = c('sigma2', 'r2'),
+                         estimate = c(summary(for_mod)$sigma2,
+                                      cor(fitted(for_mod),log(P_scaled$GPP),
+                                          use = 'complete.obs')^2))) %>%
+    mutate(model = 'GPP',
+           term = case_when(term == 'xreg1' ~ 'water_temp',
+                            term == 'xreg2' ~ 'light',
+                            term == 'xreg3' ~ 'CBP_intercept',
+                            TRUE ~ term))
+summary_fit_ER <- tidy(for_mod_ER) %>%
+    bind_rows(data.frame(term = c('sigma2', 'r2'),
+                         estimate = c(summary(for_mod_ER)$sigma2,
+                                      cor(fitted(for_mod_ER),log(P_scaled$ER),
+                                          use = 'complete.obs')^2))) %>%
+    mutate(model = 'ER',
+           term = case_when(term == 'xreg1' ~ 'light',
+                            term == 'xreg2' ~ 'water_temp',
+                            term == 'xreg3' ~ 'log_Q',
+                            term == 'xreg4' ~ 'CBP_intercept',
+                            TRUE ~ term))
+summary_fit <- bind_rows(summary_fit, summary_fit_ER)
+
+write_csv(summary_fit, 'data/Arima_hindcast_models_coefficients.csv')
+
+################################################################################
+# Make Figures:
+
+tiff('figures/Arima_hindcast_comparison_daily.tiff', width = 7.5, height = 4,
+     units = 'in', res = 300)
+# Q <- ggplot(hall_scaled, aes(date, exp(log_Q)))+
+#     geom_line() +
+#     ylab(expression(paste('Discharge (', m^3, s^-1,')')))+
+#     xlab('Date')+
+#     theme_bw()
+# tempC <- ggplot(hall_scaled, aes(date, temp.water))+
+#     geom_line() +
+#     ylab('Water Temperature (C)')+
+#     theme_bw()+
+#     theme(axis.title.x = element_blank())
+# light <- ggplot(hall_scaled, aes(date, (light - minL)/(maxL-minL)))+
+#     geom_line() +
+#     ylab('Relative Light')+
+#     theme_bw()+
+#     theme(axis.title.x = element_blank())
+ggplot() +
+    geom_line(data = hall_scaled, aes(x = date, y = ER, color = "AR1 Hindcast")) +
+    geom_line(data = hall_scaled, aes(x = date, y = GPP, color = "AR1 Hindcast")) +
+    geom_point(data = hall, aes(x = date, y = ER, color = "Historical Data")) +
+    geom_point(data = hall, aes(x = date, y = GPP, color = "Historical Data")) +
+    geom_hline(yintercept = 0) +
+    ylab(expression(paste('Metabolism (g ', O[2], m^-2, d^-1, ')'))) +
+    xlab('Date')+
+    theme_bw() +
+    # Custom legend
+    scale_color_manual(
+        values = c("AR1 Hindcast" = "black", "Historical Data" = "brown3")
+    ) +
+    guides(color = guide_legend(override.aes = list(shape = c(NA, 16), linetype = c(1, 0)))) +
+    theme(
+        legend.position = c(0.02, 0.97), # Upper-left inside the plot
+        legend.justification = c(0, 1),
+        legend.title = element_blank(),
+        # axis.title.x = element_blank()
+    )
+# cowplot::plot_grid(
+#     met, tempC, light, Q,
+#     ncol = 1,             # Define the number of columns
+#     rel_heights = c(3, 1, 1, 1),      # Relative heights for rows
+#     align = 'v',
+#     axis = 'lr'
+# )
+dev.off()
+
+
+# compare the predictions averaged across months like in Hall 1972
+hall_pred_sum <- hall_scaled %>%
+    select(date, GPP, ER) %>%
+    mutate(doy = format(date, '%j'),
+           month = month(date)) %>%
+    group_by(month) %>%
+    summarize(across(c('GPP','ER'),
+                     .fns = c(mean = \(x) mean(x, na.rm = T),
+                              sd = \(x) sd(x, na.rm = T)))) %>%
+    mutate(month_name = month.abb) %>%
+    ungroup()
+
+hall_sum <-hall %>%
+    select(date, GPP, ER) %>%
+    mutate(month = month(date)) %>%
+    group_by(month) %>%
+    summarize(across(c('GPP','ER'),
+                     .fns = c(mean = \(x) mean(x, na.rm = T),
+                              sd = \(x) sd(x, na.rm = T)))) %>%
+    mutate(month_name = month.abb[month]) %>%
+    ungroup()
+
+tiff('figures/Arima_hindcast_comparison_monthly.tiff', width = 7.5, height = 4,
+     units = 'in', res = 300)
+
+
+ggplot(hall_pred_sum, aes(month, GPP_mean)) +
+    # Ribbons for GPP and ER with grey fill (Arima Hindcast)
+    geom_ribbon(aes(ymin = GPP_mean - GPP_sd,
+                    ymax = GPP_mean + GPP_sd, fill = "AR1 Hindcast"),
+                col = NA, fill = 'grey') +
+    geom_ribbon(aes(ymin = ER_mean - ER_sd,
+                    ymax = ER_mean + ER_sd, fill = "AR1 Hindcast"),
+                col = NA, fill = 'grey') +
+
+    # Lines for GPP and ER predictions (black, Arima Hindcast)
+    geom_line(aes(y = GPP_mean, color = "AR1 Hindcast")) +
+    geom_line(aes(y = ER_mean, color = "AR1 Hindcast")) +
+
+    # Horizontal line at y = 0
+    geom_hline(yintercept = 0) +
+
+    # Lines and error bars for actual data (red, Historical Data)
+    geom_line(data = hall_sum, aes(y = GPP_mean, color = "Historical Data")) +
+    geom_errorbar(data = hall_sum, aes(ymin = GPP_mean - GPP_sd,
+                                       ymax = GPP_mean + GPP_sd, color = "Historical Data"),
+                  width = 0.2) +
+    geom_line(data = hall_sum, aes(y = ER_mean, color = "Historical Data")) +
+    geom_errorbar(data = hall_sum, aes(ymin = ER_mean - ER_sd,
+                                       ymax = ER_mean + ER_sd, color = "Historical Data"),
+                  width = 0.2) +
+    ylab(expression(paste('Metabolism (g ', O[2], m^-2, d^-1, ')'))) +
+    xlab('')+
+
+    # Custom legend
+    scale_color_manual(
+        name = "Legend",
+        values = c("AR1 Hindcast" = "black", "Historical Data" = "brown3"),
+        labels = c("AR1 Hindcast", "Historical Data")
+    ) +
+    scale_fill_manual(
+        name = "Legend",
+        values = c("AR1 Hindcast" = "grey"),
+        labels = c("AR1 Hindcast")
+    ) +
+    scale_x_continuous(
+        breaks = 1:12, # Assuming months are represented as 1-12
+        labels = month.abb
+    ) +
+    # Adjust the legend to show color, linetype, and points
+    guides(
+        color = guide_legend(override.aes = list(linetype = c(1, 1), shape = NA)),
+        fill = guide_legend(override.aes = list(linetype = 0))
+    ) +
+
+    # Apply theme adjustments
+    theme_bw() +
+    theme(
+        legend.position = c(0.88, 0.88), # Adjust as needed for legend position
+        legend.title = element_blank()
+    )
+dev.off()
+
+################################################################################
 
 
 # fit using the nlme package
