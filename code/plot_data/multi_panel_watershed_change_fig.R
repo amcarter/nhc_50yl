@@ -119,6 +119,7 @@ riparian <- left_join(NPP, lai, by = "year")
 
 # air temperature ####
 air <- read_csv( "data/watershed/noaa_air_temp.csv")
+
 air <-air %>%
   mutate(year = year(date)) %>%
   group_by(year) %>%
@@ -302,10 +303,10 @@ layout(m)
 library(forecast)
 #air
 par(mar = c(0,2,0,1),
-    oma = c(0.5, 2, 0.5, 0),
+    oma = c(2, 2, 0.5, 0),
     adj = 0, ps = 10)
 plot(cc$year, cc$temp_mean, type = 'l', lwd = 1.2, xaxt = 'n', yaxt = 'n',
-     col = dat_col, ylim = c(13.5, 17),bty = 'n')
+     col = dat_col, ylim = c(13.5, 17), bty = 'n')
 mm <- lm(temp_mean~year, data = cc)
 m_ar1 <- forecast::Arima(cc$temp_mean, order = c(1, 0, 0), xreg = matrix(cc$year, ncol = 1))
 conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
@@ -344,6 +345,7 @@ text(1970, 75, 'slope = 2.97 ± 0.06%/decade', col = precip_col, cex = 1)
 #no precip days
 m_ar1 <- forecast::Arima(cc$zero_days, order = c(1, 0, 0), xreg = matrix(cc$year, ncol = 1))
 plot(cc$year, cc$zero_days, type = 'l', lwd = 1.2, col = precip_col, axes = F)
+axis(1, padj = -0.5)
 axis(2, las = 2)#, at = c(60, 70, 80), labels = c('60%', '70%', '80%'))
 mtext('No Precip Days', 2, 2.7, cex = .8)
 mm <- lm(zero_days~year, data = cc)
