@@ -7,7 +7,12 @@ library(streamMetabolizer)
 #setwd('C:/Users/Alice Carter/Dropbox (Duke Bio_Ea)/projects/NHC_2019_metabolism/data')
 
 # Cleaning and summarizing ####
-filter_model <- function(fit, flow_dates, GPP_min = 0, ER_max = 0){
+filter_model <- function(fit, flow_dates, GPP_min = 0, ER_max = 0, group_year = FALSE){
+  min_wrap <- function(x){
+      mm <- min(x, na.rm = T)
+      if(is.infinite(mm)) mm <- NA
+      return(mm)
+  }
   q <- fit@data[,c(1,3,4,6,8)] %>%
     group_by(date) %>%
     summarize(discharge.daily = mean(discharge, na.rm = T),
@@ -26,7 +31,7 @@ filter_model <- function(fit, flow_dates, GPP_min = 0, ER_max = 0){
            K600_2.5 = K600_daily_2.5pct, K600_97.5 = K600_daily_97.5pct,
            GPP_Rhat = GPP_daily_Rhat, ER_Rhat = ER_daily_Rhat,
            K600_Rhat = K600_daily_Rhat, errors) %>%
-    left_join(q) %>%
+    left_join(q, by = 'date') %>%
     mutate(badGPP = case_when(good_flow == FALSE ~ 1,
                               GPP.upper < GPP_min ~ 1,
                               GPP_Rhat > 1.05 ~ 1,
@@ -40,18 +45,20 @@ filter_model <- function(fit, flow_dates, GPP_min = 0, ER_max = 0){
                              is.na(ER) ~ 1,
                              TRUE ~ 0))
 
-
-  coverage <- data.frame(missing_data = sum(preds$errors != ""),
-                         bad_flow = sum(preds$good_flow == FALSE, na.rm = T),
-                         neg_GPP = sum(preds$GPP.upper < GPP_min, na.rm = T),
-                         pos_ER = sum(preds$ER.lower > ER_max, na.rm = T),
-                         bad_Rhat = sum(preds$K600_Rhat > 1.05 |
-                                          preds$ER_Rhat > 1.05 |
-                                          preds$GPP_Rhat > 1.05, na.rm = T),
-                         lost_GPP = sum(preds$badGPP),
-                         lost_ER = sum(preds$badER),
-                         total_days = nrow(preds))
-  preds <- preds %>%
+    if(group_year) {preds <- mutate(preds, year = year(date)) %>%
+        group_by(year)}
+    coverage <- preds %>%
+        summarize(missing_data = sum(errors != ""),
+                  bad_flow = sum(good_flow == FALSE, na.rm = T),
+                  neg_GPP = sum(GPP.upper < GPP_min, na.rm = T),
+                  pos_ER = sum(ER.lower > ER_max, na.rm = T),
+                  bad_Rhat = sum(K600_Rhat > 1.05 |
+                                     ER_Rhat > 1.05 |
+                                     GPP_Rhat > 1.05, na.rm = T),
+                  lost_GPP = sum(badGPP),
+                  lost_ER = sum(badER),
+                  total_days = n())
+    preds <- preds %>%
     mutate(across(starts_with("ER", ignore.case = F),
                   ~ case_when(badER == 1 ~ NA_real_,
                               TRUE ~ .)),
@@ -69,9 +76,12 @@ filter_model <- function(fit, flow_dates, GPP_min = 0, ER_max = 0){
 
 }
 
-fill_summarize_met <- function(preds){
+fill_summarize_met <- function(preds, group_year = FALSE){
   w <- range(c(which(!is.na(preds$GPP)), which(!is.na(preds$ER))))
   preds <- preds[w[1]:w[2],]
+    if(group_year) {preds <- mutate(preds, year = year(date))} else
+    {preds <- mutate(preds, year = 2019)}
+  preds <- group_by(preds, year)
   met <- preds %>%
     summarize(gpp_mean = mean(GPP, na.rm = T),
               gpp_median = median(GPP, na.rm = T),
@@ -82,11 +92,10 @@ fill_summarize_met <- function(preds){
               er_max = -min(ER, na.rm = T),
               er_cv = -sd(ER, na.rm = T)/mean(ER, na.rm = T))
 
-  cum <- data.frame(date = seq(preds$date[1],
+  cum <- ungroup(preds) %>%
+      tidyr::complete(date = seq(preds$date[1],
                                preds$date[nrow(preds)],
                                by = "day")) %>%
-    as_tibble() %>%
-    left_join(preds) %>%
     select(-ends_with("Rhat"), -starts_with("K600"), -good_flow, -errors) %>%
     mutate(across(-date, na.approx, na.rm = F)) %>%
     mutate(across(starts_with("GPP"), ~ case_when(. < 0 ~ 0,
@@ -94,7 +103,9 @@ fill_summarize_met <- function(preds){
     mutate(across(starts_with("ER"), ~
                     case_when(. > 0 ~ 0,
                               TRUE ~ -.))) %>%
-    mutate(across(-date, cumsum, .names = "{col}_cum"))
+      group_by(year) %>%
+      mutate(across(-date, cumsum, .names = "{col}_cum"))
+
   n <- nrow(cum)
   l = (n-9)
   weekly <- tibble(date = cum$date[1:l],
@@ -104,14 +115,32 @@ fill_summarize_met <- function(preds){
     weekly$GPP_week[i] <- sum(cum$GPP[i:(i+9)])
     weekly$ER_week[i] <- sum(cum$ER[i:(i+9)])
   }
-  met$gpp_max10d <- weekly$date[which.max(weekly$GPP_week)]
-  met$er_max10d <- weekly$date[which.max(weekly$ER_week)]
-  se <- sum(is.na(cum$GPP))
-  met$gpp_cum <- cum$GPP_cum[n-se]*365/(n-se)
-  se <- sum(is.na(cum$ER))
-  met$er_cum <- cum$ER_cum[n-se]*365/(n-se)
-  met$daterange <- as.character(paste(cum$date[1], "-", cum$date[nrow(cum)]))
-  met$pctcoverage <- sum(!is.na(preds$GPP))/nrow(cum)
+
+    if(group_year){ weekly <-
+          mutate(weekly, year = year(date)) } else{
+              weekly$year <- 2019
+          }
+
+  weekly <- group_by(weekly, year)
+  met <- weekly %>% filter(GPP_week == max(GPP_week, na.rm = T)) %>%
+      select(gpp_max10d = date) %>%
+      right_join(met)
+  met <- weekly %>% filter(ER_week == max(ER_week, na.rm = T)) %>%
+      select(er_max10d = date) %>%
+      right_join(met)
+  met <- preds %>%
+      summarize(obs = sum(!is.na(GPP))) %>%
+      left_join(met)
+  met <- cum %>%
+      group_by(year) %>%
+      summarize(obs_GPP = sum(!is.na(GPP)),
+                obs_ER = sum(!is.na(ER)),
+                gpp_cum = max(GPP_cum, na.rm = T)*365/obs_GPP,
+                er_cum = max(ER_cum, na.rm = T) *365/obs_ER)%>%
+      left_join(met) %>%
+      mutate(pctcoverage = obs/obs_GPP,
+                nep_cum = gpp_cum - er_cum) %>%
+      select(-obs_GPP, -obs_ER)
 
   return(list(cum = cum, met = met))
 }

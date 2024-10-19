@@ -1,10 +1,7 @@
-## Model Metabolism #
-# adapted from JRB script
-# This version runs metabolism on NHC sites using the K600 values from Hall 1972
-setwd('C:/Users/alice.carter/git/nhc_50yl/src')
-source("code/metabolism/inspect_model_fits.r")
+
 # Compile model outputs ####
 
+source("code/metabolism/inspect_model_fits.r")
 flow_dates <- read_csv("data/rating_curves/flow_dates_filter.csv")
 
 filelist <- list.files("data/metabolism/modeled/finalQ")#[c(-5, -7)]
@@ -18,17 +15,15 @@ all_filled_preds <- data.frame()
 sn <- data.frame(site = c('nhc', 'pm', 'cbp','wb','wbp','unhc'),
                  sn = c('NHC_8.5', 'NHC_6.9', 'NHC_5',
                         'NHC_2.5', 'NHC_2.3', 'NHC_0'))
- # pdf("figures/model_diagnostics_raymond.pdf", width = 9, height = 6)
+# pdf("figures/model_diagnostics_raymond.pdf", width = 9, height = 6)
 obserr <- data.frame()
 for(file in filelist) {
     # uninformed raymond ests
     fit <- readRDS(paste0("data/metabolism/modeled/finalQ/", file))
     tmp <- str_match(string = file,
-                     pattern = '^[a-z]+_([a-z]+)_?([0-9]+)?_([a-z]+_[a-z]+)')
+                     pattern = '^[a-z]+_([a-z]+)_([a-z]+_[a-z]+)')
     site <- tmp[2]
-    year <- as.numeric(tmp[3])
-    if(is.na(year)) {year <- 2019}
-    method <- tmp[4]
+    method <- tmp[3]
 
     # Incorporate something here to look at obs and proc error
     obs <- get_fit(fit)$overall %>%
@@ -42,21 +37,24 @@ for(file in filelist) {
         fit@fit$daily <- fit@fit$daily %>% filter(date <= as.Date("2020-03-25"))
         fit@data_daily <- fit@data_daily %>% filter(date <= as.Date("2020-03-25"))
     }
-    out <- filter_model(fit, flow_dates)
-    preds <- out[[1]]
-    coverage <- data.frame(site = site,
-                           method = method, year = year)
-    coverage <- bind_cols(coverage, out[[2]])
 
-    out <- fill_summarize_met(preds)
+    group_year = FALSE
+    if(site %in% c('nhc', 'unhc')){group_year = TRUE}
+
+    out <- filter_model(fit, flow_dates, group_year = group_year)
+    preds <- out[[1]]
+    coverage <- out[[2]] %>%
+        mutate(site = site,
+              method = method) %>%
+        select(-any_of("year"))
+
+    out <- fill_summarize_met(preds, group_year = group_year)
     cum <- out[[1]] %>%
         mutate(site = site,
-               method = method,
-               year = year)
+               method = method)
     preds <- preds %>%
         mutate(site = site,
-               method = method,
-               year = year)
+               method = method)
 
     # bad <- unique(preds$date[is.na(preds$GPP) & is.na(preds$ER)])
     # dat <- fit@data %>%
@@ -75,17 +73,17 @@ for(file in filelist) {
     #                                 "K600_daily[20]"), nrow = 5)
     # plot_diagnostics(fit, preds, paste(site, year, method),
     #                  ylim = c(-15, 7), lim = 7)
-    tiff(paste0('figures/SI/model_fit_', site, year, '.tiff'),
-        width = 6*800, height = 3*800, res = 800, units = 'px',
-        compression = 'lzw')
-        par(ps = 10,
-            mfrow = c(1,2),
-            mar = c(3, 4, 2, 0),
-            oma = c(0, 0, 0, 2))
-        plot_binning2(fit, preds)
-        sitename <- paste(toupper(site), year, sep = " ")
-        mtext(sitename, 2, line = 3)
-        plot_KvER(preds)
+    tiff(paste0('figures/SI/model_fit_', site, '.tiff'),
+         width = 6*800, height = 3*800, res = 800, units = 'px',
+         compression = 'lzw')
+    par(ps = 10,
+        mfrow = c(1,2),
+        mar = c(3, 4, 2, 0),
+        oma = c(0, 0, 0, 2))
+    plot_binning2(fit, preds)
+    sitename <- toupper(site)
+    mtext(sitename, 2, line = 3)
+    plot_KvER(preds)
 
     dev.off()
     met_sum <- bind_cols(coverage, out[[2]])
@@ -97,6 +95,12 @@ for(file in filelist) {
 }
 # dev.off()
 
+all_preds <- mutate(all_preds,
+                    year = case_when(is.na(year) ~ 2019,
+                                     TRUE ~ year))
+met_summary <- met_summary %>%
+    filter(year %in% c(2017, 2018, 2019))
+
 saveRDS(list(preds = all_preds,
              summary = met_summary,
              cumulative = all_filled_preds),
@@ -104,25 +108,29 @@ saveRDS(list(preds = all_preds,
 
 
 all_preds %>%
-    filter(site %in% c('cbp', 'nhc')) %>%
+    filter(year %in% c(2017, 2018, 2019),
+           site %in% c('cbp', 'nhc')) %>%
     summary()
 
 preds <- all_preds %>%
-    filter(site %in% c('cbp', 'nhc')) %>%
+    filter(year %in% c(2017, 2018, 2019),
+           site %in% c('cbp', 'nhc')) %>%
     mutate(NEP = GPP+ER,
-           PR = -GPP/ER)
+           PR = -GPP/ER,
+           PR = case_when(is.infinite(PR) ~ NA,
+                          TRUE ~ PR))
 
 summary(preds)
 length(which(preds$NEP < 0))/length(which(!is.na(preds$NEP)))
 
-preds %>% filter(site != 'cbp') %>%
-    mutate(year = year(date)) %>%
-    group_by(year) %>%
+preds %>%
+    group_by(year, site) %>%
     summarize(across(c('GPP','ER'),
                      .fns = c(mean = \(x) mean(x, na.rm = T),
                               max = \(x) max(x, na.rm = T),
                               min = \(x) min(x, na.rm = T),
                               cv = \(x) sd(x, na.rm = T)/mean(x, na.rm = T))))
+met_summary %>% filter(site %in% c('cbp', 'nhc'))
 
 # png('figures/SI/KQ_KER_plots_SMfits.png', width = 7.5, height = 7,
 #     res = 300, units = 'in')

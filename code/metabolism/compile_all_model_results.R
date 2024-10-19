@@ -1,8 +1,8 @@
 ## convert model results to Carbon and compile all methods/years
 source("code/metabolism/inspect_model_fits.r")
 # Compile model outputs ####
-# convert = FALSE
-convert = TRUE
+convert = FALSE
+# convert = TRUE
 
 if(convert == TRUE){
   O2toC <- 12.0107/(2*15.999)
@@ -62,7 +62,7 @@ sm_met_sum <- sm_fit$summary %>%
   mutate(days = round(total_days * pctcoverage, 0),
          across((starts_with(c('gpp', 'er')) & !ends_with('cv')), ~ . * O2toC))
 
-hall_preds <- read_csv('data/hall/hall_table_15.csv') %>%
+hall_preds <- read_csv('data/hall_data/hall_table_15.csv') %>%
   select(date, site, depth = depth_m, GPP = GPP_gO2m2d, ER = ER_gO2m2d) %>%
   mutate(date = as.Date(date, format = "%m/%d/%Y"),
          site = case_when(site == "Concrete" ~ "CBP",
@@ -71,11 +71,17 @@ hall_preds <- read_csv('data/hall/hall_table_15.csv') %>%
          across(c('GPP', 'ER'), ~ . * O2toC)) %>%
   group_by(site, date) %>%
   summarize_all(mean, na.rm = T) %>%
-  ungroup()
-hall_qt <- read_csv("data/hall/hall_discharge_temp_daily.csv") %>%
-  rename(temp.water = water_temp_C, discharge = discharge_m3s)
+  ungroup()# %>%
+    # filter(site == 'CBP')
+hall_qt <- read_csv("data/hall_data/hall_discharge_temp_daily.csv") %>%
+  rename(temp.water = water_temp_C, discharge = discharge_m3s) %>%
+    group_by(date) %>%
+    select(-notes) %>%
+    summarize(across(everything(), ~mean(.x, na.rm = T))) %>%
+    mutate(site = 'CBP') %>%
+    ungroup()
 hall_preds <- hall_preds %>%
-  left_join(hall_qt, by = "date") %>%
+  left_join(hall_qt, by = c("date", "site")) %>%
   mutate(ER = -ER,
          era = "then",
          doy = as.numeric(format(date, '%j')),
@@ -83,7 +89,6 @@ hall_preds <- hall_preds %>%
          year = case_when(date <= as.Date("1969-04-13") ~ 1968,
                           date <= as.Date("1970-04-13") ~ 1969,
                           TRUE ~ 1970)) %>%
-  select( -notes) %>%
   filter(GPP < 3)
 
 
