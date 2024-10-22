@@ -17,7 +17,8 @@ sites <- read_csv("data/siteData/NHCsite_metadata.csv") %>%
 
 colors = MetBrewer::met.brewer(name="Kandinsky", n=4)
 
-dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_C.rds")
+# dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_C.rds")
+dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_O2.rds")
 
 preds_19 <- dat$preds %>%
   filter(year == 2019)
@@ -215,7 +216,8 @@ lsum <- litter %>%
     pivot_longer(cols = c('start', 'end'),
                  names_to = 'name',
                  values_to = 'doy') %>%
-    mutate(level = 2)
+    mutate(level = 5,
+           date = as.Date(paste(year, doy), format = '%Y %j'))
 
 qsum <- litter %>%
     filter(lf_type == 'max') %>%
@@ -232,7 +234,9 @@ tsum <- litter %>%
     labs(x = '', y = 'Water temp during peak litterfall')
 sumsum <- ggpubr::ggarrange(qsum, tsum)
 
-met <- ggplot(nhc, aes(doy)) +
+met <- nhc %>%
+    filter(year != 2016) %>%
+    ggplot(aes(doy)) +
     # geom_ribbon(aes(ymin = GPP_fill, ymax = -ER_fill),
     #             alpha = 0.2, color = NA)+
     # geom_ribbon(aes(ymax = GPP_high, ymin = -ER_fill),
@@ -243,20 +247,22 @@ met <- ggplot(nhc, aes(doy)) +
                 col = NA, fill = alpha(gppcol, 0.5))+
     geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper),
                 col = NA, fill = alpha(ercol, 0.5))+
-    geom_segment(aes(x = hurricane, y = -4, xend = hurricane, yend = -1),
+    geom_segment(aes(x = hurricane, y = -14, xend = hurricane, yend = -7),
                   arrow = arrow(length = unit(0.12, 'inches')),
                   linewidth = 1, col = colors[4])+
-    geom_text(aes(x = hurricane, y = -4.5, label = 'Hurricane Florence'),
-              vjust = 1, col = colors[4])+
+    geom_text(aes(x = hurricane, y = -16, label = 'Hurricane Florence'),
+              vjust = 1, col = colors[4], size = 4) +
     geom_hline(aes(yintercept = 0), linewidth = 0.3, col = 'gray60')+
     geom_line(data = rename(lsum, Litterfall = lf_type),
               aes(doy, level, lty = Litterfall),
               linewidth = 1, col = colors[3])+
     facet_grid(year~., scales = 'free_x')+
-    labs(x = "Day of year",
+    labs(x = "Month",
          y = expression("Metabolism (g O"[2] * "m"^-2 * "d"^-1 * ")"),
          color = "Metabolism") +
     theme_classic() +
+    scale_x_continuous(breaks = c(0,31,60,91,121,152,182,213,244,274,305,335),
+                       labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D")) +
     theme(legend.position = 'top',
           legend.justification = 'center',
           strip.background = element_blank(),
@@ -270,47 +276,34 @@ met <- ggplot(nhc, aes(doy)) +
 # cumulative metab plots
 
 cumulplots <- nhc %>%
-    select(date, starts_with(c('GPP', 'ER'), ignore.case = FALSE), doy) %>%
+    filter(year != 2016) %>%
+    select(date, starts_with(c('GPP', 'ER'), ignore.case = FALSE), doy, month) %>%
     mutate(across(starts_with("GPP"), ~ if_else(. < 0, 0, .)),
            across(starts_with("ER"), ~ if_else(. > 0, 0, .))) %>%
     mutate(year = as.numeric(strftime(date, format = '%Y'))) %>%
     group_by(year) %>%
-    mutate(across(-any_of(c('date', 'year', 'doy')), ~ na.approx(., na.rm = FALSE, rule = 2)),
-           across(-any_of(c('date', 'year', 'doy')), cumsum, .names = '{col}cumul')) %>%
+    mutate(across(-any_of(c('date', 'year', 'doy', 'month')), ~ na.approx(., na.rm = FALSE, rule = 2)),
+           across(-any_of(c('date', 'year', 'doy', 'month')), cumsum, .names = '{col}cumul')) %>%
     ungroup() %>%
     ggplot(aes(x = doy)) +
     geom_line(aes(y = GPPcumul), col = 'gray40', linewidth = 0.72) +
     geom_line(aes(y = ERcumul), col = 'gray40', linewidth = 0.72) +
-    # geom_line(aes(y = GPPcumul, col = 'GPP'), linewidth = 0.72) +
-    # geom_line(aes(y = ERcumul, col = 'ER'), linewidth = 0.72) +
-    # geom_ribbon(aes(ymin = GPP.lowercumul, ymax = GPP.uppercumul),
-    #             col = NA, fill = alpha(gppcol, 0.5)) +
-    # geom_ribbon(aes(ymin = ER.lowercumul, ymax = ER.uppercumul),
-    #             col = NA, fill = alpha(ercol, 0.5)) +
     geom_ribbon(aes(ymin = GPP.lowercumul, ymax = GPP.uppercumul, fill = 'GPP'),
                 col = NA, alpha = 0.5) +
     geom_ribbon(aes(ymin = ER.lowercumul, ymax = ER.uppercumul, fill = 'ER'),
                 col = NA, alpha = 0.5) +
     geom_hline(aes(yintercept = 0), linewidth = 0.3, col = 'gray60') +
     facet_grid(year ~ ., scales = 'free_x') +
-    labs(x = "Day of year",
+    labs(x = "Month",
          y = expression("Cumul. Metabolism (g O"[2] * "m"^-2 * ")"),
          fill = "Metabolism") +
     scale_fill_manual(values = c("GPP" = gppcol, "ER" = ercol)) +
-    # scale_color_manual(values = c("GPP" = 'gray40', "ER" = 'gray40'),
-    #                    name = '') +
+    scale_x_continuous(breaks = c(0,31,60,91,121,152,182,213,244,274,305,335),
+                       labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D")) +
     theme_classic() +
     theme(legend.position = 'top',
           legend.justification = 'left',
           legend.box.margin = margin(0, 0, 0, -120))
-    # guides(
-    #     fill = guide_legend(theme = theme(legend.position = 'top',
-    #                                       legend.justification = 'left',
-    #                                       legend.box.margin = margin(0, 0, 0, -120))),
-    #     color = guide_legend(theme = theme(legend.position = 'top',
-    #                                       legend.justification = 'left',
-    #                                       legend.box.margin = margin(0, 0, 0, -120)))
-    # )
 
 # library(gtable)
 # library(grid)
@@ -421,8 +414,10 @@ wt <- nhc %>%
     mutate(Year = factor(year))%>%
 ggplot(aes(doy, temp.water)) +
     geom_line(aes(lty = Year)) +
+    scale_x_continuous(breaks = c(0,31,60,91,121,152,182,213,244,274,305,335),
+                       labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D")) +
     theme_classic() +
-    labs(x = 'Day',
+    labs(x = 'Month',
          y = 'Water Temperature (°C)')
 
 
@@ -432,17 +427,17 @@ p2 <- ggpubr::ggarrange(fd, wt, common.legend = TRUE, nrow = 2)
 
 png(filename = 'figures/NHC_3year_met.png', width = 10, height = 4.5,
     units = 'in', res = 300)
-    ggpubr::ggarrange(met, cumulplots, p2, widths = c(2, 1, 1.2), ncol = 3) +
-        annotate("text", x = 0.09, y = 0.86, label = "A", fontface = 'bold') +
-        annotate("text", x = 0.56, y = 0.86, label = "B", fontface = 'bold') +
-        annotate("text", x = 0.97, y = 0.88, label = "C", fontface = 'bold')
+    ggpubr::ggarrange(met, cumulplots, p2, widths = c(2, 1.2, 1.2), ncol = 3) +
+        annotate("text", x = 0.09, y = 0.86, label = "a", fontface = 'bold') +
+        annotate("text", x = 0.56, y = 0.86, label = "b", fontface = 'bold') +
+        annotate("text", x = 0.97, y = 0.88, label = "c", fontface = 'bold')
 dev.off()
 tiff(filename = 'figures/NHC_3year_met.tiff', width = 10, height = 4.5,
     units = 'in', res = 300)
-    ggpubr::ggarrange(met, cumulplots, p2, widths = c(2, 1, 1.2), ncol = 3) +
-        annotate("text", x = 0.09, y = 0.86, label = "A", fontface = 'bold') +
-        annotate("text", x = 0.56, y = 0.86, label = "B", fontface = 'bold') +
-        annotate("text", x = 0.97, y = 0.88, label = "C", fontface = 'bold')
+    ggpubr::ggarrange(met, cumulplots, p2, widths = c(2, 1.2, 1.2), ncol = 3) +
+        annotate("text", x = 0.09, y = 0.86, label = "a", fontface = 'bold') +
+        annotate("text", x = 0.56, y = 0.86, label = "b", fontface = 'bold') +
+        annotate("text", x = 0.97, y = 0.88, label = "c", fontface = 'bold')
 dev.off()
 
 png(filename = 'figures/NHC_qt_during_litterfall.png', width = 6, height = 3,
@@ -496,23 +491,30 @@ ggplot(litter, aes(doy, lf))+
 
 # concrete bridge metab plot for SI
 
-cbp <- nhc %>%
-    filter(year == 2018) %>%
-    ggplot(aes(doy)) +
+lsum_cbp <- lsum %>%
+    rename(Litterfall = lf_type) %>%
+    filter(year == 2019)
+
+cbp <- dat$preds %>%
+    filter(site == 'CBP',
+           year > 2000) %>%
+    ggplot(aes(date)) +
     geom_line(aes(y = GPP), col = 'gray40', linewidth = 0.72) +
     geom_line(aes(y = ER), col = 'gray40', linewidth = 0.72) +
     geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper),
-                col = NA, fill = alpha(gppcol, 0.5))+
+                col = NA, fill = alpha(gppcol, 0.5)) +
     geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper),
-                col = NA, fill = alpha(ercol, 0.5))+
+                col = NA, fill = alpha(ercol, 0.5)) +
     geom_hline(aes(yintercept = 0), linewidth = 0.3, col = 'gray60')+
-    geom_line(data = rename(lsum, Litterfall = lf_type),
-              aes(doy, level, lty = Litterfall),
-              linewidth = 1, col = colors[3])+
-    labs(x = "Day of year",
+    geom_line(data = lsum_cbp,
+              aes(date, level, lty = Litterfall),
+              linewidth = 1, col = colors[3]) +
+    labs(x = "",
          y = expression("Metabolism (g O"[2] * "m"^-2 * "d"^-1 * ")"),
          color = "Metabolism") +
     theme_classic() +
+    # scale_x_continuous(breaks = c(0,31,60,91,121,152,182,213,244,274,305,335),
+    #                    labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D")) +
     theme(legend.position = 'top',
           legend.justification = 'left',
           strip.background = element_blank(),
