@@ -169,7 +169,7 @@ pivot_longer(cols = c('discharge', 'temperature', 'light'),
 
 ggplot( aes(value, ER, col = season)) +
   geom_point(size = 1.2) +
-  facet_grid(year~covariate, scales = 'free') +
+  facet_grid(year~covariate, scales = 'free_x') +
   scale_shape_manual(values = c(19,21)) +
   xlab(expression(paste('Discharge (', m^3, s^-1, ")                         PAR (", mu, "mol", s^-1, ")                        Temperature (", degree, "C)")))+
   theme_bw()+
@@ -187,10 +187,12 @@ nhc_seasons %>%
            discharge, temperature = temp.water, LAI, light = PAR_surface) %>%
 pivot_longer(cols = c('discharge', 'temperature', 'light'),
              names_to = 'covariate', values_to = 'value') %>%
+    # mutate(covariate = factor(covariate,
+    #                           levels = c('light', 'temperature', 'discharge'))) %>%
 
 ggplot( aes(value, GPP, col = season)) +
   geom_point(size = 1.2) +
-  facet_grid(year~covariate, scales = 'free') +
+  facet_grid(year~covariate, scales = 'free_x') +
   scale_shape_manual(values = c(19,21)) +
   xlab(expression(paste('Discharge (', m^3, s^-1, ")                         PAR (", mu, "mol", s^-1, ")                        Temperature (", degree, "C)")))+
   theme_bw()+
