@@ -3,6 +3,63 @@
 
 source("code/metabolism/inspect_model_fits.r")
 flow_dates <- read_csv("data/rating_curves/flow_dates_filter.csv")
+bad_DO_fits <- data.frame(date = c(as.Date(c('2016-12-29', '2017-03-31', '2017-04-19',
+                                           '2019-04-23', '2017-07-06', '2017-07-07',
+                                           '2017-07-08', '2017-07-10', '2017-07-11',
+                                           '2017-07-18', '2017-07-20', '2017-07-30',
+                                           '2017-07-31', '2017-08-24', '2017-08-25',
+                                           '2017-09-01', '2017-09-03', '2017-10-30',
+                                           '2017-10-31', '2017-11-13', '2017-11-30',
+                                           '2017-12-02', '2017-12-03', '2017-12-06',
+                                           '2017-12-18', '2017-12-24', '2017-12-30',
+                                           '2018-01-17', '2018-01-20', '2018-01-21',
+                                           '2018-07-28', '2018-07-29', '2019-06-06',
+                                           '2019-06-27', '2019-07-01', '2019-08-19',
+                                           '2019-08-22', '2019-08-23', '2019-09-10',
+                                           '2019-10-22', '2019-10-23', '2019-10-24',
+                                           '2019-10-26', '2019-10-31', '2019-11-06')),
+                                   seq(as.Date('2017-01-05'), as.Date('2017-01-19'), by = 'day'),
+                                   seq(as.Date('2017-07-14'), as.Date('2017-07-16'), by = 'day'),
+                                   seq(as.Date('2017-07-20'), as.Date('2017-07-25'), by = 'day'),
+                                   seq(as.Date('2017-08-10'), as.Date('2017-08-13'), by = 'day'),
+                                   seq(as.Date('2017-09-06'), as.Date('2017-09-11'), by = 'day'),
+                                   seq(as.Date('2017-09-14'), as.Date('2017-09-25'), by = 'day'),
+                                   seq(as.Date('2017-10-02'), as.Date('2017-10-04'), by = 'day'),
+                                   seq(as.Date('2017-11-03'), as.Date('2017-11-05'), by = 'day'),
+                                   seq(as.Date('2017-11-25'), as.Date('2017-11-28'), by = 'day'),
+                                   seq(as.Date('2018-06-18'), as.Date('2018-06-26'), by = 'day'),
+                                   seq(as.Date('2018-06-30'), as.Date('2018-07-04'), by = 'day'),
+                                   seq(as.Date('2018-07-09'), as.Date('2018-07-14'), by = 'day'),
+                                   seq(as.Date('2018-07-17'), as.Date('2018-07-22'), by = 'day'),
+                                   seq(as.Date('2018-08-27'), as.Date('2018-08-30'), by = 'day'),
+                                   seq(as.Date('2018-09-02'), as.Date('2018-09-08'), by = 'day'),
+                                   seq(as.Date('2019-07-03'), as.Date('2019-07-07'), by = 'day'),
+                                   seq(as.Date('2019-07-11'), as.Date('2019-07-21'), by = 'day'),
+                                   seq(as.Date('2019-07-27'), as.Date('2019-08-05'), by = 'day'),
+                                   seq(as.Date('2019-08-09'), as.Date('2019-08-14'), by = 'day'),
+                                   seq(as.Date('2019-08-28'), as.Date('2019-09-07'), by = 'day'),
+                                   seq(as.Date('2019-09-13'), as.Date('2019-09-17'), by = 'day'),
+                                   seq(as.Date('2019-09-22'), as.Date('2019-09-26'), by = 'day'),
+                                   seq(as.Date('2019-11-17'), as.Date('2019-11-22'), by = 'day'))) %>%
+    mutate(nhc = 'bad_DO')
+bad_DO_fits <- data.frame(date = as.Date(c('2019-04-02', '2019-04-07', '2019-04-10',
+                                           '2019-04-11', '2019-05-10', '2019-06-07',
+                                           '2019-06-20', '2019-08-29', '2019-09-15',
+                                           '2019-09-22', '2019-09-23', '2019-09-24',
+                                           '2019-09-29', '2019-10-03', '2019-10-12',
+                                           '2019-10-13', '2019-10-15', '2019-10-27',
+                                           '2019-10-28', '2019-11-06', '2019-11-08',
+                                           '2019-11-12', '2019-11-17', '2019-11-19',
+                                           '2019-11-21', '2019-11-28', '2019-11-29',
+                                           '2019-12-11'))) %>%
+    mutate(cbp = 'bad_DO') %>%
+    full_join(bad_DO_fits, by = 'date')
+
+flow_dates <- left_join(flow_dates, bad_DO_fits, by = 'date') %>%
+    mutate(pm = NA_character_,
+           wb = NA_character_,
+           wbp = NA_character_,
+           unhc = NA_character_)
 
 filelist <- list.files("data/metabolism/modeled/finalQ")#[c(-5, -7)]
 GPP_min = 0
@@ -41,6 +98,7 @@ for(file in filelist) {
     group_year = FALSE
     if(site %in% c('nhc', 'unhc')){group_year = TRUE}
 
+    # plot_zoom(fit@data)
     out <- filter_model(fit, flow_dates, group_year = group_year)
     preds <- out[[1]]
     coverage <- out[[2]] %>%

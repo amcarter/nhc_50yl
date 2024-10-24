@@ -16,12 +16,12 @@ filter_model <- function(fit, flow_dates, GPP_min = 0, ER_max = 0, group_year = 
   q <- fit@data[,c(1,3,4,6,8)] %>%
     group_by(date) %>%
     summarize(discharge.daily = mean(discharge, na.rm = T),
-              temp.min = min(temp.water, na.rm = T),
+              temp.min = min_wrap(temp.water),
               temp.water = mean(temp.water, na.rm = T),
               DO.obs = mean(DO.obs, na.rm = T),
               DO.sat = mean(DO.sat, na.rm = T)) %>%
     ungroup() %>%
-    left_join(flow_dates[,c(1,4)])
+    left_join(select(flow_dates, -any_of(c('nhc_q', 'deltaQ'))))
   preds <- get_fit(fit)$daily  %>%
     select(date, GPP = GPP_daily_50pct,
            GPP.lower = GPP_daily_2.5pct, GPP.upper = GPP_daily_97.5pct,
@@ -37,12 +37,14 @@ filter_model <- function(fit, flow_dates, GPP_min = 0, ER_max = 0, group_year = 
                               GPP_Rhat > 1.05 ~ 1,
                               K600_Rhat > 1.05 ~ 1,
                               is.na(GPP) ~ 1,
+                              !!sym(site) == 'bad_DO' ~ 1,
                               TRUE ~ 0),
            badER = case_when(good_flow == FALSE ~ 1,
                              ER.lower > ER_max ~ 1,
                              ER_Rhat > 1.05 ~ 1,
                              K600_Rhat > 1.05 ~ 1,
                              is.na(ER) ~ 1,
+                             !!sym(site) == 'bad_DO' ~ 1,
                              TRUE ~ 0))
 
     if(group_year) {preds <- mutate(preds, year = year(date)) %>%
@@ -70,7 +72,7 @@ filter_model <- function(fit, flow_dates, GPP_min = 0, ER_max = 0, group_year = 
                            TRUE ~ GPP),
            ER = case_when(ER > 0 ~ 0,
                           TRUE ~ ER)) %>%
-    select(-badER, -badGPP)
+    select(-badER, -badGPP, -any_of(c('nhc', 'cbp', 'unhc', 'pm', 'wb', 'wbp')))
 
   return(list(preds, coverage))
 
@@ -152,7 +154,7 @@ plot_zoom <- function(dat, vars = c("DO.obs", "DO.mod"),
   ob <- dat[,ordby, drop = T]
   tt <- dat %>%
     select(any_of(vars)) %>%
-    xts(order.by = ob)
+    xts::xts(order.by = ob)
   if("DO.mod" %in% vars){
     tt %>%
       dygraph() %>%
@@ -164,6 +166,7 @@ plot_zoom <- function(dat, vars = c("DO.obs", "DO.mod"),
       dyRangeSelector()
   }
 }
+
 plot_rhats <- function(preds){
   rh <- preds %>%
     select(date, ends_with('Rhat'))
