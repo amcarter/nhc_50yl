@@ -3,7 +3,7 @@
 # A Carter
 library(tidyverse)
 library(lubridate)
-setwd('C:/Users/alice.carter/git/nhc_50yl/src')
+# setwd('C:/Users/alice.carter/git/nhc_50yl/src')
 
 # Load metabolism predictions:
 dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_O2.rds")
@@ -20,7 +20,7 @@ for(s in sites$sitecode){
 }
 
 # load light modeled from StreamLight:
-ll <- read_csv('data/light/drivers/daily_modeled_light_all_sites.csv')
+ll <- read_csv('data/daily_modeled_light_all_sites.csv')
 
 # summarize data to daily and combine:
 d <- dd %>%
