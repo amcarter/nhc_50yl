@@ -23,7 +23,8 @@ monthly <- sm_met$preds %>%
   select(-starts_with("K600"), -ends_with(c('lower', 'upper')),
          -level_m, -doy, -method, -date, -era, -depth) %>%
   group_by(site, year, month) %>%
-  summarize(across(.fns = list(mean = ~mean(.,na.rm = T),
+  summarize(across(everything(),
+                   .fns = list(mean = ~mean(.,na.rm = T),
                                se = ~sd(.,na.rm = T)/sqrt(n())),
                    .names = "{col}_{fn}")) %>%
   ungroup()
@@ -91,7 +92,7 @@ png("figures/ER_inexcess_GPP_2019cbp.png",
          substr(month.abb[seq(1,12, by = 1)], 1,1))
 
 dev.off()
-png("figures/ER_inexcess_GPP_comparison_cbp.png",
+png("figures/ER_inexcess_GPP_comparison_cbp2.png",
     width = 4.77, height = 4.9, res = 300, units = "in")
   par(mar = c(4,4,1,1), mfrow = c(1,1))
   plot(1, type = 'n', xlim = c(1,12), ylim = c(0,4), ylab = "g O2/m2/d",
@@ -144,10 +145,12 @@ dev.off()
 colors = MetBrewer::met.brewer(name="Kandinsky", n=4)
 
 png("figures/ER_inexcess_GPP_comparison_cbp.png",
-    width = 4.3, height = 4.3, res = 300, units = "in")
+    width = 4.5, height = 4.5, res = 300, units = "in")
+
   par(mar = c(0,4,0,1), oma = c(4,0,1,1), mfrow = c(2,1))
   plot(1, type = 'n', xlim = c(1,12), ylim = c(0,3.5), ylab = "",
-       xlab = "month", xaxt = "n")
+       xlab = "month", xaxt = "n", yaxt = 'n', yaxs = 'i')
+  axis(2, las = 2, at = 0:4, labels = 0:4)
   mtext('1969', line = -1.5, adj = .05)
   polygon(c(1:8, 10:12, 12:10, 8:1), c(-then$ER_mean, rev(then$GPP_mean)),
           col = alpha("black", .2), border = NA)
@@ -172,13 +175,14 @@ png("figures/ER_inexcess_GPP_comparison_cbp.png",
          bty = 'n', lty = c(1,1), lwd = 2, cex = 0.7)
 
   plot(1, type = 'n', xlim = c(1,12), ylim = c(0,3.5), ylab = "",
-       xlab = "month", xaxt = "n")
-  axis(1, at = seq(1, 12, by = 1), labels =
-         substr(month.abb[seq(1,12, by = 1)], 1,1))
+       xlab = "month", xaxt = "n", yaxt = 'n', yaxs = 'i')
+  axis(1, at = seq(1, 12, by = 1),
+       labels = substr(month.abb[seq(1,12, by = 1)], 1,1))
+  axis(2, las = 2, at = 0:4, labels = 0:4)
 
   polygon(c(1:12,12:1),  c(-now$ER_mean, rev(now$GPP_mean)),
           col = alpha("black", .2), border = NA, lwd = 2)
-  polygon(c(2.27,3.75,3.75,2.27), c(0,0,3,3), col = 'white', border = NA)
+  polygon(c(2.27,3.75,3.75,2.27), c(0.1,0.1,3,3), col = 'white', border = NA)
   points(1:12, -now$ER_mean, col = colors[2], pch = 19)
   lines(1:12, -now$ER_mean, col = colors[2], lwd = 2)
   lines(1:12, now$GPP_mean,  col = colors[1],lwd = 2)
@@ -198,7 +202,7 @@ png("figures/ER_inexcess_GPP_comparison_cbp.png",
   mtext('2019', line = -1.5, adj = .05)
   par(mfrow = c(1,1), new = T)
   mtext('Month', side = 1, line = 2.2)
-  mtext('Metabolism (g O2/m2/d)', side = 2, line = 2.2)
+  mtext(expression('Metabolism (g O'[2] * 'm'^-2 * 'd'^-1 * ')'), side = 2, line = 2.2)
 dev.off()
 
 
