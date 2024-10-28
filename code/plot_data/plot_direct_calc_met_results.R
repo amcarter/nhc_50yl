@@ -1,5 +1,5 @@
 # plot monthly metabolism across sites for direct calculation
-dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_C.rds")
+dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_O2.rds")
 
 qt <- dat$filled %>%
   filter(!(era == "then" & year %in% c(1968, 1970))) %>%
@@ -11,6 +11,7 @@ qt <- dat$filled %>%
                                sd = ~sd(., na.rm = T)),
                    .names = '{col}_{fn}')) %>%
   ungroup()
+
 qtt <- dat$filled %>%
   filter(!(era == "then" & year %in% c(1968, 1970))) %>%
   mutate(doy = as.numeric(format(date, '%j')),
@@ -18,12 +19,13 @@ qtt <- dat$filled %>%
                           TRUE ~ site),
          site = factor(site, levels = c('NHC', 'PM', 'WB',
                                         'WBP','UNHC','CBP')))
+
 qtt <- qtt %>%
   group_by(site, year, doy) %>%
   summarize(across(all_of(c("discharge", "temp.water")),
                     ~mean(., na.rm = T))) %>%
   ungroup() %>%
-  left_join(qtt[,c(1,21,22, 24)])
+  left_join(select(qtt, site, year, doy, DO.sat_cum))
 
 ctt <- qtt %>%
   filter(site == "CBP") %>%
@@ -36,6 +38,7 @@ stt <- qtt %>%
 ytt <- qtt %>%
   filter(site %in% c('NHC', 'UNHC')) %>%
   mutate(across = "years")
+
 qtt <- bind_rows(ctt, stt, ytt) %>%
   left_join(dat$filled[,c(1,21,22, 24)]) %>%
   mutate(across = factor(across, levels = c("sites", "years", "decades")),
@@ -45,7 +48,6 @@ qqq <- qtt %>%
   group_by(site, year, across) %>%
   arrange(desc(discharge)) %>%
   mutate(index = 1:n())
-
 
 
 mon <- dat$preds  %>%
@@ -83,25 +85,24 @@ cbp_mon <- dat$preds %>%
                                # lower95 = ~quantile(., 0.025, na.rm = T)),
                    .names = '{col}_{fn}'),
             n = n())
+
 tmp <- data.frame(month = 9,
                   era = "then",
                   met = c("GPP", "ER"),
                   n = 0)
+
 cbp_mon <- bind_rows(cbp_mon, tmp) %>%
   mutate(met = factor(met, levels = c("GPP", "ER")))
          # across(ends_with("er95"), ~case_when(n == 1 ~ NA_real_,
          #                                      TRUE ~ .)))
 
 tiff(filename = 'figures/metabolism_meansd_monthly_SM.tif',
-     height = 3.6 * 800, width = 6 * 800, units = 'px', res = 800,
-     compression = 'lzw')
-# png(width = 6, height = 3.6, units='in', type='cairo', res=300,
-#     filename='figures/metabolism_meansd_monthly_SM.png')
+     height = 3.6, width = 6, units = 'in', res = 800)
 
-  cbp_mon %>%
+cbp_mon %>%
     mutate(n = case_when(era == "now" ~ NA_character_,
                          TRUE ~ as.character(n))) %>%
-  ggplot( aes(x = month, y = gCm2d_mean, fill = era)) +
+    ggplot( aes(x = month, y = gCm2d_mean, fill = era)) +
     geom_bar(stat = 'identity', position = 'dodge') +
     # geom_text(aes(y = 0.06, label = n),
     #           position = position_dodge(.9)) +
@@ -109,7 +110,7 @@ tiff(filename = 'figures/metabolism_meansd_monthly_SM.tif',
     geom_errorbar(aes(ymin = gCm2d_mean - gCm2d_sd,
                       ymax = gCm2d_mean + gCm2d_sd),
                   width = .2, position = position_dodge(.9)) +
-    ylab("Mean daily Metabolism (gC/m2/d)") +
+    ylab(expression("Mean Daily Metabolism (g Om"^-2 * "d"^-1 * ")")) +
     xlab("") +
     # ylim(c(0, 2.5)) +
     # labs(title = "Monthly metabolism at Concrete Bridge") +
@@ -117,7 +118,33 @@ tiff(filename = 'figures/metabolism_meansd_monthly_SM.tif',
     theme_bw() +
     theme(panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(),
-          legend.position = "bottom") +
+          legend.position = "none") +
+    scale_x_continuous(breaks = 1:12, labels=month.abb)
+dev.off()
+
+png(filename = 'figures/metabolism_meansd_monthly_SM.png',
+     height = 3.6, width = 6, units = 'in', res = 800)
+
+cbp_mon %>%
+    mutate(n = case_when(era == "now" ~ NA_character_,
+                         TRUE ~ as.character(n))) %>%
+    ggplot( aes(x = month, y = gCm2d_mean, fill = era)) +
+    geom_bar(stat = 'identity', position = 'dodge') +
+    # geom_text(aes(y = 0.06, label = n),
+    #           position = position_dodge(.9)) +
+    facet_wrap(.~met, ncol = 1) +
+    geom_errorbar(aes(ymin = gCm2d_mean - gCm2d_sd,
+                      ymax = gCm2d_mean + gCm2d_sd),
+                  width = .2, position = position_dodge(.9)) +
+    ylab(expression("Mean Daily Metabolism (g Om"^-2 * "d"^-1 * ")")) +
+    xlab("") +
+    # ylim(c(0, 2.5)) +
+    # labs(title = "Monthly metabolism at Concrete Bridge") +
+    scale_fill_manual(values=c(now_col, then_col)) +
+    theme_bw() +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          legend.position = "none") +
     scale_x_continuous(breaks = 1:12, labels=month.abb)
 dev.off()
 
