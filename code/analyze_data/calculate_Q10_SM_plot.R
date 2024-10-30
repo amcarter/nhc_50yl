@@ -2,12 +2,15 @@
 
 source('code/helpers.R')
 library(tidyverse)
+library(viridis)
 
 sites <- read_csv("data/siteData/NHCsite_metadata.csv") %>%
     slice(c(1:5,7))
 
-dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_O2.rds")
-d2 <- read_csv("data/metabolism/compiled/metabolism_and_drivers.csv")
+dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_O2.rds") %>%
+    distinct()
+d2 <- read_csv("data/metabolism/compiled/metabolism_and_drivers.csv") %>%
+    distinct()
 
 then_col = "brown3"
 now_col = "gray"
@@ -15,7 +18,8 @@ fall_col = "brown3"
 
 
 met <- dat$preds %>%
-  mutate(NEP = -(GPP + ER))
+    mutate(NEP = -(GPP + ER))
+
 met <- left_join(met,
                  select(d2, date, site, LAI, PAR_surface),
                  by = c('date', 'site'))
@@ -60,20 +64,21 @@ calc_q10 <- function(met) {
            r_mod = rb * q10_lm[2] ^ ((t1 - tb)/10),
            r_mod_lower = rb * q10_lm[1] ^ ((t1 - tb)/10),
            r_mod_upper = rb * q10_lm[3] ^ ((t1 - tb)/10)) %>%
-    select(date, starts_with("r_mod"))
+    select(date, starts_with("r_mod")) %>%
+      distinct()
   met <- left_join(met, tmp, by = "date")
 
   return(list(met = met,
               q10 = q10_lm,
               p = p))
-
 }
 
 
 # calc Q10 by site by month
 
 met <- dat$preds %>%
-  mutate(NEP = -(GPP + ER))
+    mutate(NEP = -(GPP + ER)) %>%
+    distinct()
 q10_all <- data.frame()
 met_rmod <- data.frame()
 
@@ -168,17 +173,19 @@ pivot_longer(cols = c('discharge', 'temperature', 'light'),
              names_to = 'covariate', values_to = 'value') %>%
 
 ggplot( aes(value, ER, col = season)) +
-  geom_point(size = 1.2) +
-  facet_grid(year~covariate, scales = 'free_x') +
-  scale_shape_manual(values = c(19,21)) +
-  xlab(expression(paste('Discharge (', m^3, s^-1, ")                         PAR (", mu, "mol", s^-1, ")                        Temperature (", degree, "C)")))+
-  theme_bw()+
-  theme(
+    geom_point(size = 1.2) +
+    facet_grid(year~covariate, scales = 'free_x') +
+    scale_shape_manual(values = c(19,21)) +
+    xlab(expression(paste('Discharge (', m^3, s^-1, ")                         PAR (", mu, "mol", s^-1, ")                        Temperature (", degree, "C)")))+
+    ylab(expression("ER (g Om"^-2 * "d"^-1 * ")")) +
+    theme_bw()+
+    theme(
         strip.background.x = element_blank(),         # Remove strip background
         strip.text.x = element_blank()             # Remove x-axis facet labels
     )
 
 dev.off()
+
 png(filename = 'figures/GPP_seasonal_rel.png',
      height = 7.5, width = 9, units = 'in', res = 300)
 nhc_seasons %>%
@@ -190,13 +197,14 @@ pivot_longer(cols = c('discharge', 'temperature', 'light'),
     # mutate(covariate = factor(covariate,
     #                           levels = c('light', 'temperature', 'discharge'))) %>%
 
-ggplot( aes(value, GPP, col = season)) +
-  geom_point(size = 1.2) +
-  facet_grid(year~covariate, scales = 'free_x') +
-  scale_shape_manual(values = c(19,21)) +
-  xlab(expression(paste('Discharge (', m^3, s^-1, ")                         PAR (", mu, "mol", s^-1, ")                        Temperature (", degree, "C)")))+
-  theme_bw()+
-  theme(
+    ggplot( aes(value, GPP, col = season)) +
+    geom_point(size = 1.2) +
+    facet_grid(year~covariate, scales = 'free_x') +
+    scale_shape_manual(values = c(19,21)) +
+    xlab(expression(paste('Discharge (', m^3, s^-1, ")                         PAR (", mu, "mol", s^-1, ")                        Temperature (", degree, "C)")))+
+    ylab(expression("GPP (g Om"^-2 * "d"^-1 * ")")) +
+    theme_bw()+
+    theme(
         strip.background.x = element_blank(),         # Remove strip background
         strip.text.x = element_blank()             # Remove x-axis facet labels
     )
@@ -367,17 +375,19 @@ tiff(filename = 'figures/NEP_drivers_NHC.tif', compression = 'lzw',
 dev.off()
 
 write_csv(ann_full, 'data/NEP_drivers_correlations_NHC_UNHC.csv')
+
 tiff(filename = "figures/NEP_drivers_legend.tif", compression = 'lzw',
     width = 10*800, height = 4.1*800,
     res = 800, units = 'px')
-    bind_rows(nhc_fall, nhc_fall1) %>%
+
+bind_rows(nhc_fall, nhc_fall1) %>%
     ggplot(aes(log(discharge), NEP, col = season)) +
-      geom_point(size = 2) +
-      facet_wrap(.~year) +
-      scale_color_manual(values = c(then_col,1)) +
-      geom_smooth(method = lm, se =F) +
-      theme_bw() +
-      theme(legend.position = 'top')
+    geom_point(size = 2) +
+    facet_wrap(.~year) +
+    scale_color_manual(values = c(then_col,1)) +
+    geom_smooth(method = lm, se =F) +
+    theme_bw() +
+    theme(legend.position = 'top')
 dev.off()
 
 m <- summary(lm(NEP ~ log10(discharge), data = nhc_fall1))
@@ -427,83 +437,103 @@ fall_means <- nhc_fall1 %>%
               ER_sd = sd(ER, na.rm = T),
               discharge_mean = median(discharge, na.rm = T),
               discharge_sd = sd(discharge, na.rm = T))
+
+vcol <- viridis(begin = 0.1, end = 0.8, n = 3)
+
+cor1 <- round(cor(nhc_fall1$ER, log10(nhc_fall1$discharge)), 2)
+
 qq <- nhc_fall1 %>%
-    left_join(select(fall_means, year, discharge_mean), by = 'year') %>%
-ggplot( aes(log10(discharge_mean), ER, group = year,
-            fill = factor(year))) +
-  geom_boxplot(width = 0.2) +
-  geom_text(data = fall_means, aes(x = log10(discharge_mean),
-                                   y = -0.5, label = year,
-                                   col = factor(year)),
-            hjust = 0.5, vjust = 0.5, size = 3) +
-  theme_bw()+
-  ylab(expression(paste("Discharge (", m^3,"/s)"))) +
-  # ylab(expression(paste("Ecosystem Respiration (g ", O[2], m^-2, d^-1, ")"))) +
-  xlab(expression(paste("Median Fall Discharge (", m^3, s^-1, ")"))) +
-  scale_x_continuous(breaks=c(-2,-1,0),
-                     labels=c(0.01, 0.1, 1)) +
-  theme(legend.position = 'none')
+    # left_join(select(fall_means, year, discharge_mean), by = 'year') %>%
+    ggplot(aes(log10(discharge), ER)) +
+    geom_point(aes(color = factor(year)), size = 0.8) +
+    geom_smooth(method = 'lm', se = FALSE, color = 'black', linewidth = 0.5) +
+    # ggplot(aes(log10(discharge_mean), ER, group = year,
+    #             fill = factor(year))) +
+    # geom_boxplot(width = 0.2) +
+    # geom_text(data = fall_means, aes(x = log10(discharge_mean),
+    #                                  y = -0.5, label = year,
+    #                                  col = factor(year)),
+    #           hjust = 0.5, vjust = 0.5, size = 3) +
+    theme_bw() +
+    scale_color_viridis_d(begin = 0.1, end = 0.8) +
+    # ylab(expression(paste("Discharge (m"^3 * "s"^-1 * ")"))) +
+    # ylab(expression(paste("Ecosystem Respiration (g ", O[2], m^-2, d^-1, ")"))) +
+    xlab(expression(paste("Median Fall Discharge (", m^3, s^-1, ")"))) +
+    scale_x_continuous(breaks = c(-2,-1,0),
+                       labels = c(0.01, 0.1, 1)) +
+    theme(legend.position = 'none',
+          axis.title.y = element_blank()) +
+    geom_text(aes(x = 0, y = -7), label = paste('r = ', cor1), col = 'black', size = 3)
 
+# q_dur <- nhc_fall1 %>%
+#     select(date, discharge) %>%
+#     mutate(year = year(date)) %>%
+#     #        discharge = case_when(discharge > 100 ~ NA_real_,
+#     #                              TRUE ~ discharge)) %>%
+#     # filter(year > 2016 & year < 2020)%>%
+#     arrange(year, discharge) %>%
+#     mutate(index = NA_real_)
+#
+# for(y in unique(q_dur$year)){
+#     n = nrow(filter(q_dur, year == y))
+#     q_dur$index[q_dur$year == y] <- seq(100, 0, length.out = n)
+# }
 
-q_dur <- nhc_fall1 %>%
-    select(date, discharge) %>%
-    mutate(year = year(date)) %>%
-    #        discharge = case_when(discharge > 100 ~ NA_real_,
-    #                              TRUE ~ discharge)) %>%
-    # filter(year > 2016 & year < 2020)%>%
-    arrange(year, discharge) %>%
-    mutate(index = NA_real_)
+# fd <- q_dur %>%
+#     mutate(Year = factor(year))%>%
+#     ggplot(aes(index, discharge)) +
+#     geom_line(aes(col = Year)) +
+#     theme_classic() +
+#     scale_y_log10()+
+#     labs(x = 'Exceedence Frequency',
+#          y = expression(paste("Discharge (", m^3,"/s)"))) +
+#     geom_text(aes(x = 85, y = 0.015), label = "2017", col = '#F8766D', size = 3)+
+#     geom_text(aes(x = 82, y = 0.75), label = "2018", col = '#00BA38', size = 3)+
+#     geom_text(aes(x = 83, y = 0.1), label = "2019", col = '#619CFF', size = 3)+
+#     theme(legend.position = 'none')
+# hyd <- nhc_fall1 %>%
+#     mutate(Year = factor(year))%>%
+#     ggplot(aes(doy, discharge)) +
+#     geom_line(aes(col = Year)) +
+#     theme_classic() +
+#     scale_y_log10()+
+#     labs(x = 'Day of year',
+#          y = expression(paste("Discharge (", m^3,"/s)"))) +
+#     geom_text(aes(x = 277, y = 0.01), label = "2017", col = '#F8766D', size = 3)+
+#     geom_text(aes(x = 277, y = 0.75), label = "2018", col = '#00BA38', size = 3)+
+#     geom_text(aes(x = 277, y = 0.05), label = "2019", col = '#619CFF', size = 3)+
+#     theme(legend.position = 'none')
 
-for(y in unique(q_dur$year)){
-    n = nrow(filter(q_dur, year == y))
-    q_dur$index[q_dur$year == y] <- seq(100, 0, length.out = n)
-}
-
-fd <- q_dur %>%
-    mutate(Year = factor(year))%>%
-    ggplot(aes(index, discharge)) +
-    geom_line(aes(col = Year)) +
-    theme_classic() +
-    scale_y_log10()+
-    labs(x = 'Exceedence Frequency',
-         y = expression(paste("Discharge (", m^3,"/s)"))) +
-    geom_text(aes(x = 85, y = 0.015), label = "2017", col = '#F8766D', size = 3)+
-    geom_text(aes(x = 82, y = 0.75), label = "2018", col = '#00BA38', size = 3)+
-    geom_text(aes(x = 83, y = 0.1), label = "2019", col = '#619CFF', size = 3)+
-    theme(legend.position = 'none')
-hyd <- nhc_fall1 %>%
-    mutate(Year = factor(year))%>%
-    ggplot(aes(doy, discharge)) +
-    geom_line(aes(col = Year)) +
-    theme_classic() +
-    scale_y_log10()+
-    labs(x = 'Day of year',
-         y = expression(paste("Discharge (", m^3,"/s)"))) +
-    geom_text(aes(x = 277, y = 0.01), label = "2017", col = '#F8766D', size = 3)+
-    geom_text(aes(x = 277, y = 0.75), label = "2018", col = '#00BA38', size = 3)+
-    geom_text(aes(x = 277, y = 0.05), label = "2019", col = '#619CFF', size = 3)+
-    theme(legend.position = 'none')
+cor2 <- nhc_fall1 %>%
+    group_by(year) %>%
+    summarize(cor = round(cor(ER, log10(discharge)), 2))
 
 tt <- ggplot(nhc_fall1, aes(temp.water, ER)) +
-  geom_point(size = 1.2) +
-  geom_point(aes(col = factor(year)), size = 1.2) +
-  geom_smooth(aes(col = factor(year)),method = lm, se = F) +
-  theme_bw()+
-  geom_text(aes(x = 22.5, y = -11), label = "2017", col = '#F8766D', size = 3)+
-  geom_text(aes(x = 22, y = -1.5), label = "2018", col = '#00BA38', size = 3)+
-  geom_text(aes(x = 23, y = -8.4), label = "2019", col = '#619CFF', size = 3)+
-  ylab(expression(paste("ER (g ", O[2], m^-2, d^-1, ")"))) +
-  xlab(expression(paste("Water Temperature (",degree,"C)"))) +
-  # ggtitle("Autumn Respiration Across Years (Oct - Nov)") +
-  labs(col = "Year") +
-  theme(legend.position = 'none')
+    # geom_point(size = 1.2) +
+    geom_point(aes(col = factor(year)), size = 0.8) +
+    geom_smooth(aes(col = factor(year)),method = lm, se = F, linewidth = 0.5) +
+    theme_bw() +
+    scale_color_viridis_d(begin = 0.1, end = 0.8) +
+    geom_text(aes(x = 22.5, y = -11.9), label = paste('r =', pull(cor2[1, 2])), col = vcol[1], size = 3) +
+    geom_text(aes(x = 22, y = -1.5), label = paste('r =', pull(cor2[2, 2])), col = vcol[2], size = 3) +
+    geom_text(aes(x = 22, y = -7.8), label = paste('r =', pull(cor2[3, 2])), col = vcol[3], size = 3) +
+    ylab(expression(paste("ER (g ", O[2], m^-2, d^-1, ")"))) +
+    xlab(expression(paste("Water Temperature (",degree,"C)"))) +
+    # ggtitle("Autumn Respiration Across Years (Oct - Nov)") +
+    labs(col = "Year") +
+    theme(legend.position = 'none')
 
 # tiff(filename = "figures/NEP_drivers_autumn_across_years.tif",
 #      compression = 'lzw', width = 6, height = 3, res = 300, units = 'in')
 png(filename = "figures/NEP_drivers_autumn_across_years1.png",
      width = 6, height = 3, res = 300, units = 'in')
   ggpubr::ggarrange(tt, qq,  labels = c("a","b"),
-                    align = 'h', vjust = 3.5, label.y = 1.08)
+                    align = 'h', vjust = 3.5, label.y = 1.08, common.legend = TRUE)
+dev.off()
+tiff(filename = "figures/NEP_drivers_autumn_across_years1.tiff",
+     width = 6, height = 3, res = 300, units = 'in')
+  ggpubr::ggarrange(tt, qq,  labels = c("a","b"),
+                    align = 'h', vjust = 3.5, label.y = 1.08, common.legend = TRUE)
 dev.off()
 
 png(filename = "figures/NEP_drivers_autumn_across_years2.png",

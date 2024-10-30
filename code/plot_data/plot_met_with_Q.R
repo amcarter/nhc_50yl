@@ -237,16 +237,20 @@ sumsum <- ggpubr::ggarrange(qsum, tsum)
 met <- nhc %>%
     filter(year != 2016) %>%
     ggplot(aes(doy)) +
-    # geom_ribbon(aes(ymin = GPP_fill, ymax = -ER_fill),
-    #             alpha = 0.2, color = NA)+
-    # geom_ribbon(aes(ymax = GPP_high, ymin = -ER_fill),
-    #             fill = 'white',color = NA)+
-    geom_line(aes(y = GPP), col = 'gray40', linewidth = 0.72) +
-    geom_line(aes(y = ER), col = 'gray40', linewidth = 0.72) +
-    geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper),
-                col = NA, fill = alpha(gppcol, 0.5))+
-    geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper),
-                col = NA, fill = alpha(ercol, 0.5))+
+    geom_point(aes(y = GPP), col = '#4F716B', shape = 20, cex = 0.7) +
+    geom_point(aes(y = ER), col = '#A2865C', shape = 20, cex = 0.7) +
+    # geom_point(aes(y = GPP), col = 'lemonchiffon4', shape = 95, cex = 2) +
+    # geom_point(aes(y = ER), col = 'wheat4', shape = 95, cex = 2) +
+    geom_linerange(aes(ymin = GPP.lower, ymax = GPP.upper),
+                col = alpha(gppcol, 0.6), linewidth = 0.3) +
+    geom_linerange(aes(ymin = ER.lower, ymax = ER.upper),
+                col = alpha(ercol, 0.6), linewidth = 0.3) +
+    # geom_line(aes(y = GPP), col = 'gray40', linewidth = 0.72) +
+    # geom_line(aes(y = ER), col = 'gray40', linewidth = 0.72) +
+    # geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper),
+    #             col = NA, fill = alpha(gppcol, 0.5))+
+    # geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper),
+    #             col = NA, fill = alpha(ercol, 0.5))+
     geom_segment(aes(x = hurricane, y = -14, xend = hurricane, yend = -7),
                   arrow = arrow(length = unit(0.12, 'inches')),
                   linewidth = 1, col = colors[4])+
@@ -499,12 +503,18 @@ cbp <- dat$preds %>%
     filter(site == 'CBP',
            year > 2000) %>%
     ggplot(aes(date)) +
-    geom_line(aes(y = GPP), col = 'gray40', linewidth = 0.72) +
-    geom_line(aes(y = ER), col = 'gray40', linewidth = 0.72) +
-    geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper),
-                col = NA, fill = alpha(gppcol, 0.5)) +
-    geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper),
-                col = NA, fill = alpha(ercol, 0.5)) +
+    geom_point(aes(y = GPP), col = '#4F716B', shape = 20, cex = 1) +
+    geom_point(aes(y = ER), col = '#A2865C', shape = 20, cex = 1) +
+    geom_linerange(aes(ymin = GPP.lower, ymax = GPP.upper),
+                   col = alpha(gppcol, 0.6), linewidth = 0.3) +
+    geom_linerange(aes(ymin = ER.lower, ymax = ER.upper),
+                   col = alpha(ercol, 0.6), linewidth = 0.3) +
+    # geom_line(aes(y = GPP), col = 'gray40', linewidth = 0.72) +
+    # geom_line(aes(y = ER), col = 'gray40', linewidth = 0.72) +
+    # geom_ribbon(aes(ymin = GPP.lower, ymax = GPP.upper),
+    #             col = NA, fill = alpha(gppcol, 0.5)) +
+    # geom_ribbon(aes(ymin = ER.lower, ymax = ER.upper),
+    #             col = NA, fill = alpha(ercol, 0.5)) +
     geom_hline(aes(yintercept = 0), linewidth = 0.3, col = 'gray60')+
     geom_line(data = lsum_cbp,
               aes(date, level, lty = Litterfall),
@@ -520,12 +530,12 @@ cbp <- dat$preds %>%
           strip.background = element_blank(),
           strip.text = element_blank())
 
-png(filename = 'figures/CBP_met.png', width = 10, height = 4.5,
+png(filename = 'figures/SI/CBP_met.png', width = 6, height = 4,
     units = 'in', res = 300)
 cbp
 dev.off()
 
-tiff(filename = 'figures/CBP_met.tiff', width = 10, height = 4.5,
+tiff(filename = 'figures/SI/CBP_met.tiff', width = 6, height = 4,
     units = 'in', res = 300)
 cbp
 dev.off()

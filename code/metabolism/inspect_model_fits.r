@@ -3,8 +3,8 @@
 library(ks)
 library(zoo)
 library(tidyverse)
-library(streamMetabolizer)
-#setwd('C:/Users/Alice Carter/Dropbox (Duke Bio_Ea)/projects/NHC_2019_metabolism/data')
+# library(streamMetabolizer)
+setwd('C:/Users/Alice Carter/Dropbox (Duke Bio_Ea)/projects/NHC_2019_metabolism/data')
 
 # Cleaning and summarizing ####
 filter_model <- function(fit, flow_dates, GPP_min = 0, ER_max = 0, group_year = FALSE){

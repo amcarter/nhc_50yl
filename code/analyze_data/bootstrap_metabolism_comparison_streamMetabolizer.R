@@ -2,10 +2,13 @@
 library(viridis)
 library(beanplot)
 library(scales)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
 
 #setup ####
 #historic data
-dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_C.rds")
+dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_O2.rds")
 # dat <- readRDS("NHC_2019_metabolism/data/metabolism/compiled/met_preds_direct_calc.rds")
 nhc_68_70 = dat$preds %>%
     filter(era == "then",
@@ -129,10 +132,10 @@ substr(new_year_agg, 1, 4) = '2020'
 new_year_agg = sort(as.Date(new_year_agg))
 ny_num = as.numeric(new_year_agg)
 
-tiff(filename = 'figures/seasonalcoverage.tif', compression = 'lzw',
-     width = 6 * 800, height = 2.05 * 800, res = 800, units = 'px')
-# png(width = 6, height=2.05, units='in', type='cairo', res=300,
-#     filename='figures/seasonalcoverage.png')
+tiff(filename = 'figures/seasonalcoverage.tif',
+     width = 6, height = 2.05, res = 800, units = 'in')
+     # width = 6 * 800, height = 2.05 * 800, res = 800, units = 'px')
+
     lims = c(min(ny_num), max(ny_num))
 
     par(mfrow=c(2,1), mar=c(0,0,0,0), oma=c(3,4,2,3))
@@ -154,6 +157,29 @@ tiff(filename = 'figures/seasonalcoverage.tif', compression = 'lzw',
 
 dev.off()
 
+png(width = 6, height=2.05, units='in', type='cairo', res=300,
+    filename='figures/seasonalcoverage.png')
+
+    lims = c(min(ny_num), max(ny_num))
+
+    par(mfrow=c(2,1), mar=c(0,0,0,0), oma=c(3,4,2,3))
+
+    beanplot(ny_num, horizontal = TRUE, col = now_col, xaxt = 'n',
+             frame.plot = FALSE, ylim = lims)
+    mtext('2019', 2, line = 1, adj = .7)
+    mtext(paste('n =', length(! is.na(ny_num))), 2, cex = .7)
+    mtext('Annual Sampling Coverage', 3, line = .1, cex = .8)
+
+    beanplot(hy_num, horizontal = TRUE, col=then_col, xaxt = 'n',
+             frame.plot = FALSE, ylim = lims)
+    mtext(paste('n =', length(! is.na(hy_num))), 2, cex = .7)
+    mtext('1968-70', 2, line = 1, adj = 1)
+    axis(1, at=seq(as.Date('2020-01-01'), as.Date('2021-01-01'),
+                   length.out=13)[1:13], labels = FALSE)
+    axis(1, at=seq(as.Date('2020-01-01'), as.Date('2021-01-01'), length.out=13)[1:12],
+         labels=month.abb, cex.axis = .8)
+
+dev.off()
 
 # bootstrap some confidence bounds ####
 # bootstrapped proportional to year, excluding september
@@ -171,7 +197,6 @@ gpp_new_bymo = split(gpp_new[!is.na(gpp_new)],
                      factor(substr(dates_new[!is.na(gpp_new)], 6, 7)))
 er_new_bymo = split(er_new[!is.na(er_new)],
                     factor(substr(dates_new[!is.na(er_new)], 6, 7)))
-
 
 nsamp = 20000
 mean_vect_er_68_70 = mean_vect_er_new = mean_vect_gpp_68_70 =
@@ -248,23 +273,35 @@ write.csv(CI_prop, 'data/metabolism/compiled/bootstrapped/SM_met_means_bootstrap
 CI <- CI %>%
     mutate(era = factor(era, levels = c("then", "now")),
            met = factor(met, levels = c("GPP", "ER")),
-           b = "Bootstrapped 95% CI's")
+           b = "Bootstrapped 95% CI")
 
-tiff(filename = 'figures/bootstrapped_CI_daily_mean_SM.tif', compression = 'lzw',
-     height = 5 * 800, width = 2.2 * 800, res = 800, units = 'px' )
-# png('figures/bootstrapped_CI_daily_mean_streamMetabolizer_2.png',
-#     height = 5, width = 2.2, type = 'cairo',  res = 300, units = 'in')
+tiff(filename = 'figures/bootstrapped_CI_daily_mean_SM.tif',
+     height = 5, width = 2.2, res = 800, units = 'in')
 
     ggplot(CI, aes(met, val, fill = era)) +
         geom_boxplot(coef = 3)+
         # stat_boxplot(geom ='errorbar', width = .1,
         #              position = position_dodge(.75)) +
-        facet_wrap(.~b)+
+        facet_wrap(.~b) +
         scale_fill_manual(values = c(then_col, now_col)) +
         theme_bw() +
         xlab("") +
-        ylim(.2, .8)+
-        ylab(expression(paste("Mean Daily Metabolism (g C/ ", m^2, "/d)")))+
+        ylab(expression("Mean Daily Metabolism (g Om"^-2 * "d"^-1 * ")")) +
+        theme(legend.position = "none",
+              panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank())
+dev.off()
+
+png(filename = 'figures/bootstrapped_CI_daily_mean_SM.png',
+     height = 5, width = 2.2, res = 800, units = 'in')
+
+    ggplot(CI, aes(met, val, fill = era)) +
+        geom_boxplot(coef = 3)+
+        facet_wrap(.~b) +
+        scale_fill_manual(values = c(then_col, now_col)) +
+        theme_bw() +
+        xlab("") +
+        ylab(expression("Mean Daily Metabolism (g Om"^-2 * "d"^-1 * ")")) +
         theme(legend.position = "none",
               panel.grid.major = element_blank(),
               panel.grid.minor = element_blank())
@@ -306,6 +343,7 @@ dat$preds %>%
 
 # png('figures/bootstrapped_CI_daily_mean_streamMetabolizer.png',
 #     height = 6, width = 3, type = cairo,  res = 300, units = 'in')
+#
 #     par(mfrow = c(1,2), mar = c(3,2,4,1), oma = c(0,3,1,0))
 #     tmp <- CI_prop %>%
 #         filter(prop == "by hall sampling")
