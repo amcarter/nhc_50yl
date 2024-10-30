@@ -286,7 +286,7 @@ tiff(filename = 'figures/bootstrapped_CI_daily_mean_SM.tif',
         scale_fill_manual(values = c(then_col, now_col)) +
         theme_bw() +
         xlab("") +
-        ylab(expression("Mean Daily Metabolism (g Om"^-2 * "d"^-1 * ")")) +
+        ylab(expression("Mean Daily Metabolism (g O"[2] * "m"^-2 * "d"^-1 * ")")) +
         theme(legend.position = "none",
               panel.grid.major = element_blank(),
               panel.grid.minor = element_blank())
@@ -301,7 +301,7 @@ png(filename = 'figures/bootstrapped_CI_daily_mean_SM.png',
         scale_fill_manual(values = c(then_col, now_col)) +
         theme_bw() +
         xlab("") +
-        ylab(expression("Mean Daily Metabolism (g Om"^-2 * "d"^-1 * ")")) +
+        ylab(expression("Mean Daily Metabolism (g O"[2] * "m"^-2 * "d"^-1 * ")")) +
         theme(legend.position = "none",
               panel.grid.major = element_blank(),
               panel.grid.minor = element_blank())

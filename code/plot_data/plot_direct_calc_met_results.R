@@ -110,7 +110,7 @@ cbp_mon %>%
     geom_errorbar(aes(ymin = gCm2d_mean - gCm2d_sd,
                       ymax = gCm2d_mean + gCm2d_sd),
                   width = .2, position = position_dodge(.9)) +
-    ylab(expression("Mean Daily Metabolism (g Om"^-2 * "d"^-1 * ")")) +
+    ylab(expression("Mean Daily Metabolism (g O"[2] * "m"^-2 * "d"^-1 * ")")) +
     xlab("") +
     # ylim(c(0, 2.5)) +
     # labs(title = "Monthly metabolism at Concrete Bridge") +
@@ -136,7 +136,7 @@ cbp_mon %>%
     geom_errorbar(aes(ymin = gCm2d_mean - gCm2d_sd,
                       ymax = gCm2d_mean + gCm2d_sd),
                   width = .2, position = position_dodge(.9)) +
-    ylab(expression("Mean Daily Metabolism (g Om"^-2 * "d"^-1 * ")")) +
+    ylab(expression("Mean Daily Metabolism (g O"[2] * "m"^-2 * "d"^-1 * ")")) +
     xlab("") +
     # ylim(c(0, 2.5)) +
     # labs(title = "Monthly metabolism at Concrete Bridge") +

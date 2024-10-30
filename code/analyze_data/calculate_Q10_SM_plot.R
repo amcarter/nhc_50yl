@@ -7,8 +7,7 @@ library(viridis)
 sites <- read_csv("data/siteData/NHCsite_metadata.csv") %>%
     slice(c(1:5,7))
 
-dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_O2.rds") %>%
-    distinct()
+dat <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_O2.rds")
 d2 <- read_csv("data/metabolism/compiled/metabolism_and_drivers.csv") %>%
     distinct()
 
@@ -18,6 +17,7 @@ fall_col = "brown3"
 
 
 met <- dat$preds %>%
+    distinct() %>%
     mutate(NEP = -(GPP + ER))
 
 met <- left_join(met,
@@ -177,7 +177,7 @@ ggplot( aes(value, ER, col = season)) +
     facet_grid(year~covariate, scales = 'free_x') +
     scale_shape_manual(values = c(19,21)) +
     xlab(expression(paste('Discharge (', m^3, s^-1, ")                         PAR (", mu, "mol", s^-1, ")                        Temperature (", degree, "C)")))+
-    ylab(expression("ER (g Om"^-2 * "d"^-1 * ")")) +
+    ylab(expression("ER (g O"[2] * "m"^-2 * "d"^-1 * ")")) +
     theme_bw()+
     theme(
         strip.background.x = element_blank(),         # Remove strip background
@@ -202,7 +202,7 @@ pivot_longer(cols = c('discharge', 'temperature', 'light'),
     facet_grid(year~covariate, scales = 'free_x') +
     scale_shape_manual(values = c(19,21)) +
     xlab(expression(paste('Discharge (', m^3, s^-1, ")                         PAR (", mu, "mol", s^-1, ")                        Temperature (", degree, "C)")))+
-    ylab(expression("GPP (g Om"^-2 * "d"^-1 * ")")) +
+    ylab(expression("GPP (g O"[2] * "m"^-2 * "d"^-1 * ")")) +
     theme_bw()+
     theme(
         strip.background.x = element_blank(),         # Remove strip background
@@ -458,7 +458,7 @@ qq <- nhc_fall1 %>%
     scale_color_viridis_d(begin = 0.1, end = 0.8) +
     # ylab(expression(paste("Discharge (m"^3 * "s"^-1 * ")"))) +
     # ylab(expression(paste("Ecosystem Respiration (g ", O[2], m^-2, d^-1, ")"))) +
-    xlab(expression(paste("Median Fall Discharge (", m^3, s^-1, ")"))) +
+    xlab(expression(paste("Discharge (", m^3, s^-1, ")"))) +
     scale_x_continuous(breaks = c(-2,-1,0),
                        labels = c(0.01, 0.1, 1)) +
     theme(legend.position = 'none',
