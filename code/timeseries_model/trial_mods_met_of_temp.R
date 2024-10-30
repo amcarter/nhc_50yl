@@ -79,25 +79,25 @@ plot(light)
 
 
 # add light to Hall datset and scale
-# hall_preds <- hall_QT %>%
-#     mutate(doy = format(date, '%j'),
-#            # don't allow discharge to be less than 50% of the minimum we observed at the same site
-#            discharge_m3s = case_when(discharge_m3s < 0.5*min_Q ~ 0.5 * min_Q,
-#                                      TRUE ~ discharge_m3s)) %>%
-#     left_join(light, by = 'doy') %>%
-#     mutate(site = 'CBP', log_Q = log(discharge_m3s)) %>%
-#     dplyr::select(date, site,  temp.water = water_temp_C, log_Q, light) %>%
-#     mutate(across(c('log_Q', 'light', 'temp.water'),
-#                   .fns = \(x) zoo::na.approx(x, na.rm = F)),
-#            sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
-#            cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
-#            month = month(date),
-#            season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
-#                               month %in% c(3, 4, 5) ~ 'Spring',
-#                               month %in% c(6, 7, 8) ~ 'Summer',
-#                               month %in% c(9, 10, 11) ~ 'Fall'),
-#            site = factor(site, levels = c("CBP", "NHC"))) %>%
-#     slice_head(n = -4)
+hall_preds <- hall_QT %>%
+    mutate(doy = format(date, '%j'),
+           # don't allow discharge to be less than 50% of the minimum we observed at the same site
+           discharge_m3s = case_when(discharge_m3s < 0.5*min_Q ~ 0.5 * min_Q,
+                                     TRUE ~ discharge_m3s)) %>%
+    left_join(light, by = 'doy') %>%
+    mutate(site = 'CBP', log_Q = log(discharge_m3s)) %>%
+    dplyr::select(date, site,  temp.water = water_temp_C, log_Q, light) %>%
+    mutate(across(c('log_Q', 'light', 'temp.water'),
+                  .fns = \(x) zoo::na.approx(x, na.rm = F)),
+           sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
+           cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
+           month = month(date),
+           season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
+                              month %in% c(3, 4, 5) ~ 'Spring',
+                              month %in% c(6, 7, 8) ~ 'Summer',
+                              month %in% c(9, 10, 11) ~ 'Fall'),
+           site = factor(site, levels = c("CBP", "NHC"))) %>%
+    slice_head(n = -4)
 
 hall_preds <- hall_QT %>%
     mutate(doy = format(date, '%j'),

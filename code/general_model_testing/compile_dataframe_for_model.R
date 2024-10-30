@@ -39,5 +39,5 @@ met <- met %>%
                            TRUE ~ depth)) %>%
   select(-depth_hall, -method, -era)
 
-write_csv(met, 'data/metabolism/metabolism_and_drivers.csv')
+write_csv(met, 'data/metabolism/compiled/metabolism_and_drivers.csv')
 
