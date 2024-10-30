@@ -28,16 +28,39 @@ airtemp <- read_csv('data/watershed/noaa_air_temp.csv') %>%
     rename(temp_C = temp_mean)
 
 P <- dat %>%
-  select(date, site,ER,  GPP, GPP.lower, GPP.upper, discharge,
-         temp.water, light = PAR_surface)%>%#, slope) %>%
-  group_by(site) %>%
-  left_join(select(sites, site = sitecode, slope = slope_nhd)) %>%
-  filter(site %in% c('CBP', 'NHC')) %>%
-  mutate(log_Q = log(discharge))
+    select(date, site,ER,  GPP, GPP.lower, GPP.upper, discharge,
+           temp.water, light = PAR_surface)%>%#, slope) %>%
+    group_by(site) %>%
+    left_join(select(sites, site = sitecode, slope = slope_nhd)) %>%
+    filter(site %in% c('CBP', 'NHC')) %>%
+    mutate(log_Q = log(discharge),
+           diff_Q = c(NA, diff(log_Q)),
+           RBI_7 = NA_real_,
+           year = lubridate::year(date),
+           year = case_when(year == 2020 ~ 2019,
+                            year == 2016 ~ 2017,
+                            TRUE ~ year))
+
+for(s in c('NHC', 'CBP')){
+    P1 <- P[P$site == s,] %>%
+        mutate(log_Q = na.approx(log_Q, na.rm = FALSE))
+    for(i in 8:nrow(P1)){
+        P1$RBI_7[i] = sum(abs(P1$diff_Q[(i-6):i]))/7
+    }
+    P$RBI_7[P$site == s] <- P1$RBI_7
+}
+
+Q_sum <- P %>%
+    group_by(site, year) %>%
+    filter(lubridate::month(date) %in% c(9, 10, 11)) %>%
+    summarize(med_log_Q = median(log_Q, na.rm = T),
+              mean_log_Q = mean(log_Q, na.rm = T))
+
+P <- left_join(P, Q_sum, by = c('site', 'year'))
 
 scaling_pars <- P %>%
     ungroup() %>%
-    summarize(across(c('log_Q', 'light', 'temp.water'),
+    summarize(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
                      .fns = c(mean = \(x) mean(x, na.rm = TRUE),
                               sd = \(x) sd(x, na.rm = TRUE))))
 
@@ -50,15 +73,29 @@ epsilon = 1e-1
 
 P_scaled <- P %>%
     ungroup() %>%
-    mutate(across(c('log_Q', 'light', 'temp.water'),
+    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
                   .fns = \(x) as.vector(scale(x))),
            GPP = GPP + epsilon,
            ER = -ER + epsilon,
-           GPP_pred = log(GPP),
            site = factor(site, levels = c("CBP", "NHC")),
            CBP = case_when(site == 'CBP' ~ 1,
                            TRUE ~ 0)) %>%
     slice(-c(1, 362:386, 1506)) # remove leading and ending NA's in metabolism from each site
+
+P_scaled <- P %>%
+    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
+                  .fns = \(x) as.vector(scale(x))),
+           sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
+           cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
+           month = month(date),
+           season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
+                              month %in% c(3, 4, 5) ~ 'Spring',
+                              month %in% c(6, 7, 8) ~ 'Summer',
+                              month %in% c(9, 10, 11) ~ 'Fall'),
+           GPP = GPP + epsilon,
+           ER = -ER + epsilon,
+           site = factor(site, levels = c("CBP", "NHC")))
+
 # plot(density(log(P_scaled$GPP), na.rm = T))
 # plot(density(log(-P_scaled$ER), na.rm = T))
 
@@ -73,22 +110,54 @@ light <- P %>%
 plot(light)
 
 # add light to Hall daatset and scale
-hall_preds <- hall_QT %>%
+hall_QT <- hall_QT %>%
     mutate(doy = format(date, '%j'),
            # don't allow discharge to be less than 50% of the minimum we observed at the same site
            discharge_m3s = case_when(discharge_m3s < 0.5*min_Q ~ 0.5 * min_Q,
                                      TRUE ~ discharge_m3s)) %>%
     left_join(light, by = 'doy') %>%
-    mutate(site = 'CBP', log_Q = log(discharge_m3s)) %>%
-    dplyr::select(date, site,  temp.water = water_temp_C, log_Q, light) %>%
-    mutate(across(c('log_Q', 'light', 'temp.water'),
+    mutate(site = 'CBP',
+           log_Q = log(discharge_m3s),
+           diff_Q = c(NA, diff(log_Q)),
+           RBI_7 = NA_real_)
+Q_sum_hall <- hall_QT %>%
+    filter(lubridate::month(date) %in% c(9, 10, 11)) %>%
+    summarize(med_log_Q = median(log_Q, na.rm = T),
+              mean_log_Q = mean(log_Q, na.rm = T))
+
+for(i in 8:nrow(hall_QT)){
+    hall_QT$RBI_7[i] = sum(abs(hall_QT$diff_Q[(i-6):i]))/7
+}
+
+hall_preds <- hall_QT %>%
+    dplyr::select(date, site,  temp.water = water_temp_C, log_Q, diff_Q, RBI_7, light) %>%
+    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
                   .fns = \(x) zoo::na.approx(x, na.rm = F)),
            site = factor(site, levels = c("CBP", "NHC"))) %>%
     slice_head(n = -4)
 
+hall_preds <- hall_QT %>%
+    dplyr::select(date, site,  temp.water = water_temp_C, log_Q, diff_Q, RBI_7, light) %>%
+    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
+                  .fns = \(x) zoo::na.approx(x, na.rm = F)),
+           sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
+           cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
+           month = month(date),
+           season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
+                              month %in% c(3, 4, 5) ~ 'Spring',
+                              month %in% c(6, 7, 8) ~ 'Summer',
+                              month %in% c(9, 10, 11) ~ 'Fall'),
+           site = factor(site, levels = c("CBP", "NHC"))) %>%
+    slice_head(n = -4)
+
+hall_preds$med_log_Q = Q_sum_hall$med_log_Q
+hall_preds$mean_log_Q = Q_sum_hall$mean_log_Q
 
 hall_scaled <- hall_preds %>%
-    mutate(log_Q = (log_Q - scaling_pars$log_Q_mean)/scaling_pars$log_Q_sd,
+    mutate(diff_Q = abs(c(NA, diff(log_Q))),
+           log_Q = (log_Q - scaling_pars$log_Q_mean)/scaling_pars$log_Q_sd,
+           diff_Q = (diff_Q - scaling_pars$diff_Q_mean)/scaling_pars$diff_Q_sd,
+           RBI_7 = (RBI_7 - scaling_pars$RBI_7_mean)/scaling_pars$RBI_7_sd,
            light = (light - scaling_pars$light_mean)/scaling_pars$light_sd,
            temp.water = (temp.water - scaling_pars$temp.water_mean)/scaling_pars$temp.water_sd)
 
@@ -108,15 +177,16 @@ GPP_priors <- c(prior("normal(0,5)", class = "b"),
                 prior("normal(0,5)", class = "Intercept"),
                 prior("cauchy(0,1)", class = "sigma"))
 
-# bmod_GPP <- brm(bform_GPP,
-#                 data = P_scaled,
-#                 chains = 4, cores = 4, iter = 4000,
-#                 prior = GPP_priors,
-#                 control = list(adapt_delta = 0.99,
-#                                max_treedepth = 14) )
+bmod_GPP <- brm(bform_GPP,
+                data = P_scaled,
+                chains = 4, cores = 4, iter = 4000,
+                prior = GPP_priors,
+                control = list(adapt_delta = 0.999,
+                               stepsize = 0.01,
+                               max_treedepth = 14) )
 
 # evaluate model fit:
-# saveRDS(bmod_GPP, 'data/timeseries_model_fits/brms_GPP_mod.rds')
+saveRDS(bmod_GPP, 'data/timeseries_model_fits/brms_GPP_mod.rds')
 bmod_GPP <- readRDS('data/timeseries_model_fits/brms_GPP_mod.rds')
 
 summary(bmod_GPP)
@@ -211,23 +281,25 @@ hindcast_GPP <- data.frame(
 
 ############## model for ER
 
-bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water + light + log_Q)
+bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*mean_log_Q + light)
+bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*med_log_Q + light)
 get_prior(bform_ER, data = P_scaled)
 ER_priors <- c(prior("normal(0,5)", class = "b"),
                prior("normal(0,5)", class = "Intercept"),
                prior("cauchy(0,1)", class = "sigma"),
                prior("beta(1,1)", class = "ar", lb = 0, ub = 1))
-# bmod_ER <- brm(bform_ER,
-#                data = P_scaled,
-#                prior = ER_priors,
-#                chains = 4, cores = 4, iter = 4000,
-#                control = list(adapt_delta = 0.99,
-#                               max_treedepth = 12))
-#
-# saveRDS(bmod_ER, 'data/timeseries_model_fits/brms_ER_mod.rds')
+bmod_ER2 <- brm(bform_ER,
+               data = P_scaled,
+               prior = ER_priors,
+               chains = 4, cores = 4, iter = 4000,
+               control = list(adapt_delta = 0.999,
+                              stepsize = 0.01,
+                              max_treedepth = 14))
+
+saveRDS(bmod_ER, 'data/timeseries_model_fits/brms_ER_mod.rds')
 bmod_ER <- readRDS('data/timeseries_model_fits/brms_ER_mod.rds')
 
-summary(bmod_ER)
+summary(bmod_ER2)
 
 png('figures/SI/BRMS_er_posterior_pred_check.png', width = 5, height = 4,
     units = 'in', res = 300)
@@ -243,8 +315,6 @@ lines(density(P_scaled$log_ER, na.rm = T))
 
 dev.off()
 
-
-brms::bayes_R2(bmod_ER)
 
 # args_y <- list(bmod_ER)
 # args_ypred <- list(bmod_ER)
@@ -273,20 +343,23 @@ brms::bayes_R2(bmod_ER)
 draws_fit_ER <- as_draws_array(bmod_ER)
 ER_pars <- posterior::summarize_draws(draws_fit_ER) %>%
     filter(variable %in% c('b_Intercept', 'b_temp.water', 'b_light',
-                           'b_log_Q', 'ar[1]', 'sigma',
+                           'b_mean_log_Q', 'b_temp.water:mean_log_Q',
+                           'ar[1]', 'sigma',
                            'r_site[CBP,Intercept]', 'r_site[NHC,Intercept]',
                            'sd_site__Intercept') ) %>%
     mutate(model = "ER")
 
 pd <- posterior::subset_draws(draws_fit_ER,
                               variable = c('b_Intercept', 'b_temp.water', 'b_light',
-                                           'b_log_Q', 'ar[1]', 'sigma',
+                                           'b_mean_log_Q', 'b_temp.water:mean_log_Q',
+                                           'ar[1]', 'sigma',
                                            'r_site[CBP,Intercept]',
                                            'r_site[NHC,Intercept]'),
                               draw = 1:2000)
 post_ER <- data.frame(matrix(pd, nrow = 2000, byrow = FALSE))
-colnames(post_ER) <- c('intercept', 'b_temp.water', 'b_light', 'b_logQ', 'phi',
-                    'sigma', 'cbp_intercept', 'nhc_intercept')
+colnames(post_ER) <- c('intercept', 'b_temp.water', 'b_light', 'b_meanlogQ',
+                       'b_temp.water_meanlogQ', 'phi',
+                       'sigma', 'cbp_intercept', 'nhc_intercept')
 
 # matrix of draws from the posterior-predictive distribution
 draws <- nrow(post_ER)
@@ -304,11 +377,14 @@ for(i in 1:draws){
         post_preds_ER[i, t] <- (1 - post_ER$phi[i]) * (post_ER$intercept[i] + post_ER$cbp_intercept[i]) +
             post_ER$b_light[i] * hall_scaled$light[t] +
             post_ER$b_temp.water[i] * hall_scaled$temp.water[t] +
-            post_ER$b_logQ[i] * hall_scaled$log_Q[t] +
+            post_ER$b_meanlogQ[i] * hall_scaled$mean_log_Q[t] +
+            post_ER$b_temp.water_meanlogQ[i] * hall_scaled$temp.water[t] * hall_scaled$mean_log_Q[t] +
             post_ER$phi[i] * post_preds_ER[i, t-1] -
             post_ER$phi[i] * (post_ER$b_light[i] * hall_scaled$light[t-1] +
                                post_ER$b_temp.water[i] * hall_scaled$temp.water[t-1] +
-                               post_ER$b_logQ[i] * hall_scaled$log_Q[t-1]) #+ rnorm(1, sd = post$sigma[i])
+                               post_ER$b_meanlogQ[i] * hall_scaled$mean_log_Q[t-1] +
+                               post_ER$b_temp.water_meanlogQ[i] * hall_scaled$temp.water[t-1] *
+                                  hall_scaled$mean_log_Q[t-1])
     }
     post_preds_err_ER[i,] <- rnorm(nrow(hall_scaled), post_preds_ER[i,], post_ER$sigma[i])
 
@@ -363,8 +439,8 @@ bind_rows(GPP_pars, ER_pars) %>%
 
 hindcast <- left_join(hindcast, select(hall_QT, date, discharge_m3s))
 
-tiff('figures/BRMS_hindcast_comparison_daily.tiff', width = 7.5, height = 4,
-     units = 'in', res = 300)
+# tiff('figures/BRMS_hindcast_comparison_daily.tiff', width = 7.5, height = 4,
+#      units = 'in', res = 300)
 # png('figures/BRMS_hindcast_comparison_daily.png', width = 7.5, height = 4,
 #      units = 'in', res = 300)
 
@@ -569,13 +645,19 @@ met_change <- data.frame(
 )
 
 met_change <- met_change %>%
-    mutate(doy = format(date, '%j')) %>%
+    mutate(doy = format(date, '%j'),
+           year = lubridate::year(date)) %>%
     left_join(LQ, by = 'doy') %>%
     left_join(airtemp, by = 'date') %>%
     mutate(light = zoo::na.approx(light, na.rm = F))
 met_change$temp.water <- predict(t_mod, newdata = met_change)
+Q_sum <- met_change %>%
+    group_by(year) %>%
+    filter(lubridate::month(date) %in% c(9, 10, 11)) %>%
+    summarize(mean_log_Q = mean(log_Q, na.rm = T))
 
 met_change_scaled <- met_change %>%
+    left_join(Q_sum, by = 'year') %>%
     select(-temp_C) %>%
     mutate(log_Q = (log_Q - scaling_pars$log_Q_mean)/scaling_pars$log_Q_sd,
            light = (light - scaling_pars$light_mean)/scaling_pars$light_sd,
@@ -611,11 +693,15 @@ for(i in 1:draws){
         post_preds_ER[i, t] <- (1 - post_ER$phi[i]) * (post_ER$intercept[i] + post_ER$cbp_intercept[i]) +
             post_ER$b_light[i] * met_change_scaled$light[t] +
             post_ER$b_temp.water[i] * met_change_scaled$temp.water[t] +
-            post_ER$b_logQ[i] * met_change_scaled$log_Q[t] +
+            post_ER$b_meanlogQ[i] * met_change_scaled$mean_log_Q[t] +
+            post_ER$b_temp.water_meanlogQ[i] * met_change_scaled$temp.water[t] *
+                met_change_scaled$mean_log_Q[t] +
             post_ER$phi[i] * post_preds_ER[i, t-1] -
             post_ER$phi[i] * (post_ER$b_light[i] * met_change_scaled$light[t-1] +
                                   post_ER$b_temp.water[i] * met_change_scaled$temp.water[t-1] +
-                                  post_ER$b_logQ[i] * met_change_scaled$log_Q[t-1])
+                                  post_ER$b_meanlogQ[i] * met_change_scaled$mean_log_Q[t-1] +
+                                  post_ER$b_temp.water_meanlogQ[i] * met_change_scaled$temp.water[t-1] *
+                                    met_change_scaled$mean_log_Q[t-1])
     }
 
     post_preds_err_GPP[i,] <- rnorm(nrow(met_change_scaled), post_preds_GPP[i,], post_GPP$sigma[i])

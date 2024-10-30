@@ -163,7 +163,10 @@ saveRDS(list(preds = all_preds,
              summary = met_summary,
              cumulative = all_filled_preds),
         "data/metabolism/compiled/raymond_met.rds")
+dat <- readRDS('data/metabolism/compiled/raymond_met.rds')
 
+all_preds <- dat$preds
+met_summary <- dat$summary
 
 all_preds %>%
     filter(year %in% c(2017, 2018, 2019),
