@@ -1,8 +1,9 @@
 # calculate Q10 for NHC sites from SM metabolism estimates
 
 source('code/helpers.R')
-library(tidyverse)
+nestlibrary(tidyverse)
 library(viridis)
+library(purrr)
 
 sites <- read_csv("data/siteData/NHCsite_metadata.csv") %>%
     slice(c(1:5,7))
@@ -163,22 +164,28 @@ nhc_seasons <- met %>%
                          levels = c("Spring (Mar-May)", "Summer (Jun-Aug)",
                                     "Fall (Sep-Nov)", "Winter (Dec-Feb)")))
 
+# 9-plots ####
+
 png(filename = 'figures/ER_seasonal_rel.png',
      height = 7.5, width = 9, units = 'in', res = 300)
-nhc_seasons %>%
+
+erseas <- nhc_seasons %>%
     mutate(discharge = log(discharge)) %>%
     select(date, site, year, season, GPP, ER, NEP,
            discharge, temperature = temp.water, LAI, light = PAR_surface) %>%
 pivot_longer(cols = c('discharge', 'temperature', 'light'),
-             names_to = 'covariate', values_to = 'value') %>%
+             names_to = 'covariate', values_to = 'value')
 
-ggplot( aes(value, ER, col = season)) +
+erseas$covariate <- factor(erseas$covariate, levels = c("light", "temperature", "discharge"))
+
+erseas %>%
+    ggplot(aes(value, ER, col = season)) +
     geom_point(size = 1.2) +
-    facet_grid(year~covariate, scales = 'free_x') +
+    facet_grid(year~covariate, scales = 'free_x', labeller = label_parsed) +
     scale_shape_manual(values = c(19,21)) +
-    xlab(expression(paste('Discharge (', m^3, s^-1, ")                         PAR (", mu, "mol", s^-1, ")                        Temperature (", degree, "C)")))+
+    xlab(expression(paste("PAR (", mu, "mol", s^-1, ")                       Temperature (", degree, 'C)                   Log Discharge (', m^3, s^-1, ")")))+
     ylab(expression("ER (g O"[2] * "m"^-2 * "d"^-1 * ")")) +
-    theme_bw()+
+    theme_bw() +
     theme(
         strip.background.x = element_blank(),         # Remove strip background
         strip.text.x = element_blank()             # Remove x-axis facet labels
@@ -188,28 +195,111 @@ dev.off()
 
 png(filename = 'figures/GPP_seasonal_rel.png',
      height = 7.5, width = 9, units = 'in', res = 300)
-nhc_seasons %>%
+
+gppseas <- nhc_seasons %>%
     mutate(discharge = log(discharge)) %>%
     select(date, site, year, season, GPP, ER, NEP,
            discharge, temperature = temp.water, LAI, light = PAR_surface) %>%
 pivot_longer(cols = c('discharge', 'temperature', 'light'),
-             names_to = 'covariate', values_to = 'value') %>%
-    # mutate(covariate = factor(covariate,
-    #                           levels = c('light', 'temperature', 'discharge'))) %>%
+             names_to = 'covariate', values_to = 'value')
 
-    ggplot( aes(value, GPP, col = season)) +
+gppseas$covariate <- factor(gppseas$covariate, levels = c("light", "temperature", "discharge"))
+
+gppseas %>%
+    ggplot(aes(value, GPP, col = season)) +
     geom_point(size = 1.2) +
-    facet_grid(year~covariate, scales = 'free_x') +
+    facet_grid(year~covariate, scales = 'free_x', labeller = label_parsed) +
     scale_shape_manual(values = c(19,21)) +
-    xlab(expression(paste('Discharge (', m^3, s^-1, ")                         PAR (", mu, "mol", s^-1, ")                        Temperature (", degree, "C)")))+
+    xlab(expression(paste("PAR (", mu, "mol", s^-1, ")                       Temperature (", degree, 'C)                   Log Discharge (', m^3, s^-1, ")")))+
     ylab(expression("GPP (g O"[2] * "m"^-2 * "d"^-1 * ")")) +
-    theme_bw()+
+    theme_bw() +
     theme(
         strip.background.x = element_blank(),         # Remove strip background
         strip.text.x = element_blank()             # Remove x-axis facet labels
     )
 
 dev.off()
+
+# gppseas <- nhc_seasons %>%
+#     mutate(discharge = log(discharge)) %>%
+#     select(date, site, year, season, GPP, ER, NEP,
+#            discharge, temperature = temp.water, LAI, light = PAR_surface) %>%
+#     pivot_longer(cols = c('discharge', 'temperature', 'light'),
+#                  names_to = 'covariate', values_to = 'value')
+#
+# gppseas %>%
+#     ggplot(aes(value, GPP, col = season)) +
+#     geom_point(size = 1.2) +
+#     facet_grid(year~covariate, scales = 'free_x') +
+#     scale_shape_manual(values = c(19, 21)) +
+#     xlab(expression(paste("PAR (", mu, "mol", s^-1, ")                       Temperature (", degree, 'C)                       Discharge (', m^3, s^-1, ")")))+
+#     ylab(expression("GPP (g O"[2] * "m"^-2 * "d"^-1 * ")")) +
+#     theme_bw() +
+#     theme(
+#         strip.background.x = element_blank(),         # Remove strip background
+#         strip.text.x = element_blank()             # Remove x-axis facet labels
+#     )
+
+# gppfacet1 <- gppseas %>%
+#     filter(covariate == 'light') %>%
+#     ggplot(aes(value, GPP, col = season)) +
+#     geom_point(size = 1.2) +
+#     facet_grid(rows = vars(year)) +
+#     scale_shape_manual(values = c(19, 21)) +
+#     xlab(expression(paste("PAR (", mu, "mol", s^-1, ")"))) +
+#     ylab(expression("GPP (g O"[2] * "m"^-2 * "d"^-1 * ")")) +
+#     theme_bw() +
+#     theme(
+#         plot.margin = margin(1, 1, 1, 1, "pt"),
+#         strip.background.y = element_blank(),         # Remove strip background
+#         strip.text.y = element_blank()             # Remove x-axis facet labels
+#     )
+#
+# gppfacet2 <- gppseas %>%
+#     filter(covariate == 'temperature') %>%
+#     ggplot(aes(value, GPP, col = season)) +
+#     geom_point(size = 1.2) +
+#     facet_grid(rows = vars(year)) +
+#     scale_shape_manual(values = c(19, 21)) +
+#     xlab(expression(paste("Temperature (", degree, "C)"))) +
+#     ylab('') +
+#     theme_bw() +
+#     theme(
+#         plot.margin = margin(1, 1, 1, 1, "pt"),
+#         axis.text.y = element_blank(),
+#         axis.ticks.y = element_blank(),
+#         strip.background.y = element_blank(),         # Remove strip background
+#         strip.text.y = element_blank()             # Remove x-axis facet labels
+#     )
+#
+# exp_labels <- function(x) round(exp(x), 1)
+#
+# gppfacet3 <- gppseas %>%
+#     filter(covariate == 'discharge') %>%
+#     ggplot(aes(value, GPP, col = season)) +
+#     geom_point(size = 1.2) +
+#     facet_grid(rows = vars(year)) +
+#     scale_shape_manual(values = c(19, 21)) +
+#     xlab(expression(paste("Discharge (", m^3, s^-1, ")"))) +
+#     ylab('') +
+#     theme_bw() +
+#     theme(
+#         plot.margin = margin(1, 1, 1, 1, "pt"),
+#         axis.text.y = element_blank(),
+#         axis.ticks.y = element_blank()
+#     ) +
+#     scale_x_continuous(
+#         labels = exp_labels,
+#         breaks = scales::trans_breaks("log", function(x) exp(x)),
+#     )
+#     # scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+#     #               labels = trans_format("log10", math_format(10^.x)))
+#
+# png(filename = 'figures/GPP_seasonal_rel.png',
+#     height = 7.5, width = 9, units = 'in', res = 300)
+# ggpubr::ggarrange(gppfacet1, gppfacet2, gppfacet3,
+#                   ncol = 3, align ='v', common.legend = TRUE)
+# dev.off()
 
 # ggplot(nhc_seasons, aes(log(discharge), NEP, col = season)) +
 #   geom_point(size = 2) +
@@ -218,6 +308,72 @@ dev.off()
 #   geom_smooth(method = lm, se =F) +
 #   theme_bw()
 
+# 9-plot tables ####
+
+erseas_ann <- erseas %>%
+    group_by(year, covariate) %>%
+    nest() %>%
+    mutate(m = map(data, ~ coef(lm(ER ~ value, data = .))[2]),
+           r = map(data, ~ cor(.x$ER, .x$value, use = 'pairwise.complete.obs'))) %>%
+    select(-data) %>%
+    unnest(cols = c(m, r)) %>%
+    ungroup() %>%
+    mutate(season = 'all')
+erseas_seas <- erseas %>%
+    group_by(year, covariate, season) %>%
+    nest() %>%
+    mutate(m = map(data, ~ coef(lm(ER ~ value, data = .))[2]),
+           r = map(data, ~ cor(.x$ER, .x$value, use = 'pairwise.complete.obs'))) %>%
+    select(-data) %>%
+    unnest(cols = c(m, r)) %>%
+    ungroup() %>%
+    mutate(season = case_match(season,
+                               'Spring (Mar-May)' ~ '1',
+                               'Summer (Jun-Aug)' ~ '2',
+                               'Fall (Sep-Nov)' ~ '3',
+                               'Winter (Dec-Feb)' ~ '4'))
+
+er_table <- bind_rows(erseas_ann, erseas_seas) %>%
+    pivot_wider(names_from = covariate,
+                values_from = all_of(c('m', 'r'))) %>%
+    arrange(year, season)
+
+gppseas_ann <- gppseas %>%
+    group_by(year, covariate) %>%
+    nest() %>%
+    mutate(m = map(data, ~ coef(lm(GPP ~ value, data = .))[2]),
+           r = map(data, ~ cor(.x$GPP, .x$value, use = 'pairwise.complete.obs'))) %>%
+    select(-data) %>%
+    unnest(cols = c(m, r)) %>%
+    ungroup() %>%
+    mutate(season = 'all')
+gppseas_seas <- gppseas %>%
+    group_by(year, covariate, season) %>%
+    nest() %>%
+    mutate(m = map(data, ~ coef(lm(GPP ~ value, data = .))[2]),
+           r = map(data, ~ cor(.x$GPP, .x$value, use = 'pairwise.complete.obs'))) %>%
+    select(-data) %>%
+    unnest(cols = c(m, r)) %>%
+    ungroup() %>%
+    mutate(season = case_match(season,
+                               'Spring (Mar-May)' ~ '1',
+                               'Summer (Jun-Aug)' ~ '2',
+                               'Fall (Sep-Nov)' ~ '3',
+                               'Winter (Dec-Feb)' ~ '4'))
+
+gpp_table <- bind_rows(gppseas_ann, gppseas_seas) %>%
+    pivot_wider(names_from = covariate,
+                values_from = all_of(c('m', 'r'))) %>%
+    arrange(year, season)
+
+full_join(gpp_table, er_table,
+          by = c('year', 'season'),
+          suffix = c('_gpp', '_er')) %>%
+    mutate(across(-all_of(c('year', 'season')), ~round(., 2))) %>%
+    write_csv('data/tables/metab_slopes_correlations.csv')
+
+# other stuff ####
+
 ann_full <- data.frame()
 # ss = c('NHC', 'UNHC')
 ss = 'NHC'
@@ -225,11 +381,11 @@ nhc_fall <- dat$preds %>%
   mutate(NEP = -(GPP + ER),
          season = "Full Year") %>%
   filter(site %in% ss,
-         year !=2020,
+         year != 2020,
          !is.na(NEP))
 nhc_fall1 <- nhc_fall %>%
-  filter(month %in% c(10:11)) %>%
-  mutate(season = "Fall (Oct-Nov)")
+  filter(month %in% c(9:11)) %>%
+  mutate(season = "Fall (Sept-Nov)")
 # nhc_fall <- nhc_fall1 %>%
 #   bind_rows(nhc_fall) %>%
 #   mutate(season = factor(season, levels = c("Full Year", "Fall (Oct-Nov)")))
