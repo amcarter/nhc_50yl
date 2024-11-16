@@ -282,13 +282,13 @@ hindcast_GPP <- data.frame(
 ############## model for ER
 
 bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*mean_log_Q + light)
-bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*med_log_Q + light)
+# bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*med_log_Q + light)
 get_prior(bform_ER, data = P_scaled)
 ER_priors <- c(prior("normal(0,5)", class = "b"),
                prior("normal(0,5)", class = "Intercept"),
                prior("cauchy(0,1)", class = "sigma"),
                prior("beta(1,1)", class = "ar", lb = 0, ub = 1))
-bmod_ER2 <- brm(bform_ER,
+bmod_ER <- brm(bform_ER,
                data = P_scaled,
                prior = ER_priors,
                chains = 4, cores = 4, iter = 4000,
@@ -299,7 +299,7 @@ bmod_ER2 <- brm(bform_ER,
 saveRDS(bmod_ER, 'data/timeseries_model_fits/brms_ER_mod.rds')
 bmod_ER <- readRDS('data/timeseries_model_fits/brms_ER_mod.rds')
 
-summary(bmod_ER2)
+summary(bmod_ER)
 
 png('figures/SI/BRMS_er_posterior_pred_check.png', width = 5, height = 4,
     units = 'in', res = 300)
