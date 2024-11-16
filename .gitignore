@@ -3,6 +3,7 @@ data
 !data/gee
 !data/map_files
 !data/watershed_boundary
+!data/tables
 .Rhistory
 *.doc
 .Rproj.user
@@ -18,5 +19,4 @@ data_bak
 *.tif
 map_files_archived/map_files
 *.zip
-
 code/analyze_data/*.rds

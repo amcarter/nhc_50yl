@@ -1,9 +1,10 @@
 # calculate Q10 for NHC sites from SM metabolism estimates
 
 source('code/helpers.R')
-nestlibrary(tidyverse)
+library(tidyverse)
 library(viridis)
 library(purrr)
+library(ggthemes)
 
 sites <- read_csv("data/siteData/NHCsite_metadata.csv") %>%
     slice(c(1:5,7))
@@ -25,119 +26,115 @@ met <- left_join(met,
                  select(d2, date, site, LAI, PAR_surface),
                  by = c('date', 'site'))
 
-calc_q10 <- function(met) {
-  if(!("r1" %in% colnames(met))){
-    met$r1 = met$NEP
-  }
-  if(!('t1' %in% colnames(met))){
-    met$t1 = met$temp.water
-  }
-  mm <- filter(met, r1 > 0)
-  qq <- data.frame()
-  for(i in 1:(nrow(mm))){
-    resp2 = mm$r1[i]
-    temp2 = mm$t1[i]
-    q <- mm[-i,] %>%
-      mutate(r2 = resp2,
-             t2 = temp2)
-    qq <- bind_rows(qq, q)
-  }
-  qqq <- qq %>%
-    filter((t2-t1) >= 0.1) %>%
-    mutate(deltaT = (t2 - t1)/10,
-           rr = r2/r1,
-           q10 = rr ^ (1/deltaT))
-
-  m <- lm(log(rr) ~ 0 + deltaT, data = qqq)
-  q10_m = m$coefficients[1]
-  q10_sd = summary(m)$coefficients[2] * sqrt(nrow(qqq))
-  q10_lm = c(exp(c(q10_m - q10_sd, q10_m, q10_m+q10_sd)),
-             summary(m)$r.squared)
-  names(q10_lm) <- c("lower", "median","upper", "r2")
-
-  p<- ggplot(qqq, aes(deltaT, log(rr))) +
-    geom_point() +
-    geom_smooth(method = lm)
-
-  tmp <- mm %>%
-    mutate(rb = median(r1, na.rm = T),
-           tb = median(t1, na.rm = T),
-           r_mod = rb * q10_lm[2] ^ ((t1 - tb)/10),
-           r_mod_lower = rb * q10_lm[1] ^ ((t1 - tb)/10),
-           r_mod_upper = rb * q10_lm[3] ^ ((t1 - tb)/10)) %>%
-    select(date, starts_with("r_mod")) %>%
-      distinct()
-  met <- left_join(met, tmp, by = "date")
-
-  return(list(met = met,
-              q10 = q10_lm,
-              p = p))
-}
-
-
-# calc Q10 by site by month
-
-met <- dat$preds %>%
-    mutate(NEP = -(GPP + ER)) %>%
-    distinct()
-q10_all <- data.frame()
-met_rmod <- data.frame()
-
-# pdf("figures/q10_relationships.pdf", onefile = T, height = 11, width = 8.5)
-# par(mfrow = c(5,3), mar = c(2,2,3,1))
-for(s in unique(sites$sitecode)) {
-  smet <- filter(met, site == s)
-  for(y in unique(smet$year)){
-    ymet <- filter(smet, year == y)
-    # mm <- filter(smet, year == y)
-    for(m in 1:12){
-      mm <- filter(ymet, month == m)
-      mm$r1 <- -mm$ER
-      n <- length(which(mm$r1 > 0))
-      if(n < 5) {next}
-      qmod <- calc_q10(mm)
-      # print(p + ggtitle(paste(s, y, m, sep = " ")))
-      q10 = data.frame(site = s,
-                       year = y,
-                       month = m,
-                       q10_lower = NA_real_,
-                       q10 = NA_real_,
-                       q10_upper = NA_real_,
-                       r2 = NA_real_,
-                       n = n)
-      q10[,4:7] <- qmod$q10
-      q10_all <- bind_rows(q10_all, q10)
-      qmod$met <- left_join(qmod$met, q10, by = c("site", "year", "month"))
-      met_rmod <- bind_rows(met_rmod, qmod$met)
-    }
-  }
-}
-# dev.off()
-met <- met_rmod  %>%
-  select(-r1, -t1) %>%
-  filter(q10 < 8,
-         r2 >= 0.1)
-
-write_csv(met, "data/metabolism/Q10vNEP_all_sites_SM.csv")
+# calc_q10 <- function(met) {
+#   if(!("r1" %in% colnames(met))){
+#     met$r1 = met$NEP
+#   }
+#   if(!('t1' %in% colnames(met))){
+#     met$t1 = met$temp.water
+#   }
+#   mm <- filter(met, r1 > 0)
+#   qq <- data.frame()
+#   for(i in 1:(nrow(mm))){
+#     resp2 = mm$r1[i]
+#     temp2 = mm$t1[i]
+#     q <- mm[-i,] %>%
+#       mutate(r2 = resp2,
+#              t2 = temp2)
+#     qq <- bind_rows(qq, q)
+#   }
+#   qqq <- qq %>%
+#     filter((t2-t1) >= 0.1) %>%
+#     mutate(deltaT = (t2 - t1)/10,
+#            rr = r2/r1,
+#            q10 = rr ^ (1/deltaT))
+#
+#   m <- lm(log(rr) ~ 0 + deltaT, data = qqq)
+#   q10_m = m$coefficients[1]
+#   q10_sd = summary(m)$coefficients[2] * sqrt(nrow(qqq))
+#   q10_lm = c(exp(c(q10_m - q10_sd, q10_m, q10_m+q10_sd)),
+#              summary(m)$r.squared)
+#   names(q10_lm) <- c("lower", "median","upper", "r2")
+#
+#   p<- ggplot(qqq, aes(deltaT, log(rr))) +
+#     geom_point() +
+#     geom_smooth(method = lm)
+#
+#   tmp <- mm %>%
+#     mutate(rb = median(r1, na.rm = T),
+#            tb = median(t1, na.rm = T),
+#            r_mod = rb * q10_lm[2] ^ ((t1 - tb)/10),
+#            r_mod_lower = rb * q10_lm[1] ^ ((t1 - tb)/10),
+#            r_mod_upper = rb * q10_lm[3] ^ ((t1 - tb)/10)) %>%
+#     select(date, starts_with("r_mod")) %>%
+#       distinct()
+#   met <- left_join(met, tmp, by = "date")
+#
+#   return(list(met = met,
+#               q10 = q10_lm,
+#               p = p))
+# }
+#
+#
+# # calc Q10 by site by month
+# q10_all <- data.frame()
+# met_rmod <- data.frame()
+#
+# # pdf("figures/q10_relationships.pdf", onefile = T, height = 11, width = 8.5)
+# # par(mfrow = c(5,3), mar = c(2,2,3,1))
+# for(s in unique(sites$sitecode)) {
+#   smet <- filter(met, site == s)
+#   for(y in unique(smet$year)){
+#     ymet <- filter(smet, year == y)
+#     # mm <- filter(smet, year == y)
+#     for(m in 1:12){
+#       mm <- filter(ymet, month == m)
+#       mm$r1 <- -mm$ER
+#       n <- length(which(mm$r1 > 0))
+#       if(n < 5) {next}
+#       qmod <- calc_q10(mm)
+#       # print(p + ggtitle(paste(s, y, m, sep = " ")))
+#       q10 = data.frame(site = s,
+#                        year = y,
+#                        month = m,
+#                        q10_lower = NA_real_,
+#                        q10 = NA_real_,
+#                        q10_upper = NA_real_,
+#                        r2 = NA_real_,
+#                        n = n)
+#       q10[,4:7] <- qmod$q10
+#       q10_all <- bind_rows(q10_all, q10)
+#       qmod$met <- left_join(qmod$met, q10, by = c("site", "year", "month"))
+#       met_rmod <- bind_rows(met_rmod, qmod$met)
+#     }
+#   }
+# }
+# # dev.off()
+# met <- met_rmod  %>%
+#   select(-r1, -t1) %>%
+#   filter(q10 < 8,
+#          r2 >= 0.1)
+#
+# write_csv(met, "data/metabolism/Q10vNEP_all_sites_SM.csv")
 
 # png("figures/all_sites_q10_modeled_NEP.png", width = 4, height = 4,
 #     res = 300, units = 'in')
-  ggplot(met, aes(-ER, r_mod, col = factor(year))) +
-    geom_point(size = 1.5) +
-    geom_errorbar(aes(ymin = r_mod_lower, ymax = r_mod_upper), width = 0) +
-    geom_abline(intercept = 0, slope = 1, lty = 2, col = "brown3") +
-    facet_wrap(~site)+
-    xlab("respiration (gC/m2/d)") +
-    ylab("Q10 based modeled respiration") +
-    labs(title = "All sites based on monthly Q10")
+  # ggplot(met, aes(-ER, r_mod, col = factor(year))) +
+  #   geom_point(size = 1.5) +
+  #   geom_errorbar(aes(ymin = r_mod_lower, ymax = r_mod_upper), width = 0) +
+  #   geom_abline(intercept = 0, slope = 1, lty = 2, col = "brown3") +
+  #   facet_wrap(~site)+
+  #   xlab("respiration (gC/m2/d)") +
+  #   ylab("Q10 based modeled respiration") +
+  #   labs(title = "All sites based on monthly Q10")
 
-  ggplot(met, aes(month, q10, color = factor(year))) +
-    geom_point() +
-    facet_wrap(~site)
+  # ggplot(met, aes(month, q10, color = factor(year))) +
+  #   geom_point() +
+  #   facet_wrap(~site)
 # dev.off()
-  labs(title = paste(met$site[1], met$year[1], month.abb[met$month[1]],
-        "  Q10 = ", round(mean(met$q10, na.rm = T), 1),
-        "  r2 = ", round(met$r2[1], 3)))
+  # labs(title = paste(met$site[1], met$year[1], month.abb[met$month[1]],
+  #       "  Q10 = ", round(mean(met$q10, na.rm = T), 1),
+  #       "  r2 = ", round(met$r2[1], 3)))
 
 nhc <- met %>%
   filter(site %in% c('NHC', 'UNHC')) %>%
@@ -152,12 +149,9 @@ nhcs <-  nhc %>%
   mutate(period = "Summer (Jun-Aug)") %>%
   bind_rows(nhcf)
 
-nhc_seasons <- met %>%
-    left_join(select(d2, date, site, LAI, PAR_surface),
-              by = c('date', 'site')) %>%
-  filter(site %in% c('NHC'), year !=2020) %>%
-  mutate(NEP = -(GPP + ER),
-         season = factor(case_when(month %in% c(1,2,12) ~ "Winter (Dec-Feb)",
+nhc_seasons <- met  %>%
+  filter(site %in% c('NHC'), ! year %in% c(2016, 2020)) %>%
+  mutate(season = factor(case_when(month %in% c(1,2,12) ~ "Winter (Dec-Feb)",
                                    month %in% c(3:5) ~ "Spring (Mar-May)",
                                    month %in% c(6:8) ~ "Summer (Jun-Aug)",
                                    month %in% c(9:11) ~ "Fall (Sep-Nov)"),
@@ -173,17 +167,18 @@ erseas <- nhc_seasons %>%
     mutate(discharge = log(discharge)) %>%
     select(date, site, year, season, GPP, ER, NEP,
            discharge, temperature = temp.water, LAI, light = PAR_surface) %>%
-pivot_longer(cols = c('discharge', 'temperature', 'light'),
+    mutate(light_mmol = light/1000) %>%
+pivot_longer(cols = c('discharge', 'temperature', 'light_mmol'),
              names_to = 'covariate', values_to = 'value')
 
-erseas$covariate <- factor(erseas$covariate, levels = c("light", "temperature", "discharge"))
+erseas$covariate <- factor(erseas$covariate, levels = c("light_mmol", "temperature", "discharge"))
 
 erseas %>%
     ggplot(aes(value, ER, col = season)) +
     geom_point(size = 1.2) +
     facet_grid(year~covariate, scales = 'free_x', labeller = label_parsed) +
     scale_shape_manual(values = c(19,21)) +
-    xlab(expression(paste("PAR (", mu, "mol", s^-1, ")                       Temperature (", degree, 'C)                   Log Discharge (', m^3, s^-1, ")")))+
+    xlab(expression(paste("PAR (mmol ", m^-2, s^-1, ")                       Temperature (", degree, 'C)                   Log Discharge (', m^3, s^-1, ")")))+
     ylab(expression("ER (g O"[2] * "m"^-2 * "d"^-1 * ")")) +
     theme_bw() +
     theme(
@@ -200,17 +195,18 @@ gppseas <- nhc_seasons %>%
     mutate(discharge = log(discharge)) %>%
     select(date, site, year, season, GPP, ER, NEP,
            discharge, temperature = temp.water, LAI, light = PAR_surface) %>%
-pivot_longer(cols = c('discharge', 'temperature', 'light'),
+    mutate(light_mmol = light/1000) %>%
+pivot_longer(cols = c('discharge', 'temperature', 'light_mmol'),
              names_to = 'covariate', values_to = 'value')
 
-gppseas$covariate <- factor(gppseas$covariate, levels = c("light", "temperature", "discharge"))
+gppseas$covariate <- factor(gppseas$covariate, levels = c("light_mmol", "temperature", "discharge"))
 
 gppseas %>%
     ggplot(aes(value, GPP, col = season)) +
     geom_point(size = 1.2) +
     facet_grid(year~covariate, scales = 'free_x', labeller = label_parsed) +
     scale_shape_manual(values = c(19,21)) +
-    xlab(expression(paste("PAR (", mu, "mol", s^-1, ")                       Temperature (", degree, 'C)                   Log Discharge (', m^3, s^-1, ")")))+
+    xlab(expression(paste("PAR (mmol ", m^-2, s^-1, ")                       Temperature (", degree, 'C)                   Log Discharge (', m^3, s^-1, ")")))+
     ylab(expression("GPP (g O"[2] * "m"^-2 * "d"^-1 * ")")) +
     theme_bw() +
     theme(
@@ -220,12 +216,6 @@ gppseas %>%
 
 dev.off()
 
-# gppseas <- nhc_seasons %>%
-#     mutate(discharge = log(discharge)) %>%
-#     select(date, site, year, season, GPP, ER, NEP,
-#            discharge, temperature = temp.water, LAI, light = PAR_surface) %>%
-#     pivot_longer(cols = c('discharge', 'temperature', 'light'),
-#                  names_to = 'covariate', values_to = 'value')
 #
 # gppseas %>%
 #     ggplot(aes(value, GPP, col = season)) +
@@ -309,8 +299,20 @@ dev.off()
 #   theme_bw()
 
 # 9-plot tables ####
+gppseas <- nhc_seasons %>%
+    mutate(discharge = log(discharge)) %>%
+    select(date, site, year, season, GPP, ER, NEP,
+           discharge, temperature = temp.water, LAI, light = PAR_surface) %>%
+    mutate(light_mmol = c(scale(light)), discharge = c(scale(discharge)),
+           temperature = c(scale(temperature)),
+           GPP = c(scale(GPP)),
+           ER = c(scale(ER))) %>%
+    pivot_longer(cols = c('discharge', 'temperature', 'light_mmol'),
+                 names_to = 'covariate', values_to = 'value')
 
-erseas_ann <- erseas %>%
+gppseas$covariate <- factor(gppseas$covariate, levels = c("light_mmol", "temperature", "discharge"))
+
+erseas_ann <- gppseas %>%
     group_by(year, covariate) %>%
     nest() %>%
     mutate(m = map(data, ~ coef(lm(ER ~ value, data = .))[2]),
@@ -319,7 +321,7 @@ erseas_ann <- erseas %>%
     unnest(cols = c(m, r)) %>%
     ungroup() %>%
     mutate(season = 'all')
-erseas_seas <- erseas %>%
+erseas_seas <- gppseas %>%
     group_by(year, covariate, season) %>%
     nest() %>%
     mutate(m = map(data, ~ coef(lm(ER ~ value, data = .))[2]),
@@ -370,6 +372,7 @@ full_join(gpp_table, er_table,
           by = c('year', 'season'),
           suffix = c('_gpp', '_er')) %>%
     mutate(across(-all_of(c('year', 'season')), ~round(., 2))) %>%
+    # rename_with(~sub('\\[,1\\]', '', .))
     write_csv('data/tables/metab_slopes_correlations.csv')
 
 # other stuff ####
@@ -527,7 +530,7 @@ qq <- ggplot(nhc_fall, aes(log10(discharge), NEP), col = 1) +
 # dev.off()
 tiff(filename = 'figures/NEP_drivers_NHC.tif', compression = 'lzw',
      width = 7.5, height = 5, units = 'in', res = 300)
-     ggpubr::ggarrange(tt, qq, ncol = 1, align ='v')
+ggpubr::ggarrange(tt, qq, ncol = 1, align ='v')
 dev.off()
 
 write_csv(ann_full, 'data/NEP_drivers_correlations_NHC_UNHC.csv')
@@ -537,13 +540,15 @@ tiff(filename = "figures/NEP_drivers_legend.tif", compression = 'lzw',
     res = 800, units = 'px')
 
 bind_rows(nhc_fall, nhc_fall1) %>%
+    filter(year != 2016) %>%
     ggplot(aes(log(discharge), NEP, col = season)) +
     geom_point(size = 2) +
     facet_wrap(.~year) +
-    scale_color_manual(values = c(then_col,1)) +
-    geom_smooth(method = lm, se =F) +
+    scale_color_manual(values = c(then_col, 1)) +
+    geom_smooth(method = lm, se = F) +
     theme_bw() +
     theme(legend.position = 'top')
+
 dev.off()
 
 m <- summary(lm(NEP ~ log10(discharge), data = nhc_fall1))
@@ -581,10 +586,9 @@ tt <- ggplot(nhc_fall1, aes(temp.water, NEP)) +
 
 tiff(filename = "figures/NEP_drivers_autumn_across_years_old.tif",
      compression = 'lzw', width = 6, height = 5*6/8.4, res = 800, units = 'in')
-  ggpubr::ggarrange(tt, qq, common.legend = T, labels = c("A","B"),
-                    align = 'h', vjust = 3.5, label.y = 1.08)
+ggpubr::ggarrange(tt, qq, common.legend = T, labels = c("A","B"),
+                align = 'h', vjust = 3.5, label.y = 1.08)
 dev.off()
-
 
 
 fall_means <- nhc_fall1 %>%
@@ -683,25 +687,26 @@ tt <- ggplot(nhc_fall1, aes(temp.water, ER)) +
 #      compression = 'lzw', width = 6, height = 3, res = 300, units = 'in')
 png(filename = "figures/NEP_drivers_autumn_across_years1.png",
      width = 6, height = 3, res = 300, units = 'in')
-  ggpubr::ggarrange(tt, qq,  labels = c("a","b"),
-                    align = 'h', vjust = 3.5, label.y = 1.08, common.legend = TRUE)
+ggpubr::ggarrange(tt, qq,  labels = c("a","b"),
+                align = 'h', vjust = 3.5, label.y = 1.08, common.legend = TRUE)
 dev.off()
+
 tiff(filename = "figures/NEP_drivers_autumn_across_years1.tiff",
      width = 6, height = 3, res = 300, units = 'in')
-  ggpubr::ggarrange(tt, qq,  labels = c("a","b"),
-                    align = 'h', vjust = 3.5, label.y = 1.08, common.legend = TRUE)
+ggpubr::ggarrange(tt, qq,  labels = c("a","b"),
+                align = 'h', vjust = 3.5, label.y = 1.08, common.legend = TRUE)
 dev.off()
 
 png(filename = "figures/NEP_drivers_autumn_across_years2.png",
      width = 6, height = 3, res = 300, units = 'in')
-  ggpubr::ggarrange(tt, fd,  labels = c("a","b"),
-                    align = 'h', vjust = 3.5, label.y = 1.08)
+ggpubr::ggarrange(tt, fd,  labels = c("a","b"),
+                align = 'h', vjust = 3.5, label.y = 1.08)
 dev.off()
 
 png(filename = "figures/NEP_drivers_autumn_across_years3.png",
      width = 6, height = 3, res = 300, units = 'in')
-  ggpubr::ggarrange(tt, hyd,  labels = c("a","b"),
-                    align = 'h', vjust = 3.5, label.y = 1.08)
+ggpubr::ggarrange(tt, hyd,  labels = c("a","b"),
+                align = 'h', vjust = 3.5, label.y = 1.08)
 dev.off()
 
 
@@ -747,8 +752,8 @@ ggplot(nhc_fall, aes(temp.water, GPP)) +
 
 tiff(filename = "figures/NEP_drivers_autumn_across_years.tif",
      compression = 'lzw', width = 6, height = 3, res = 800, units = 'in')
-  ggpubr::ggarrange(tt, qq,  labels = c("a","b"),
-                    align = 'h', vjust = 3.5, label.y = 1.08)
+ggpubr::ggarrange(tt, qq,  labels = c("a","b"),
+                align = 'h', vjust = 3.5, label.y = 1.08)
 dev.off()
 
 
@@ -870,3 +875,70 @@ for(s in unique(nhc$site)){
 #   theme_bw()
 # dev.off()
 
+
+# mean fall Q vs. various things ####
+
+mean_fall <- erseas %>%
+    filter(grepl('Fall', season), covariate == 'discharge') %>%
+    group_by(year) %>%
+    summarize(mean_q = mean(value, na.rm = TRUE),
+              sd_q = sd(value, na.rm = TRUE),
+              mean_fall_er = mean(ER, na.rm = TRUE),
+              sd_fall_er = sd(ER, na.rm = TRUE))
+
+cumul_ann_resp <- erseas %>%
+    group_by(year) %>%
+    summarize(cumul_er = sum(ER, na.rm = TRUE),
+              sd_er = sd(ER, na.rm = TRUE))
+
+temp_slope <- er_table %>%
+    filter(season == 3) %>%
+    select(year, m_temperature)
+
+dd <- left_join(mean_fall, cumul_ann_resp, by = 'year') %>%
+    left_join(temp_slope, by = 'year')
+
+p1 <- dd %>%
+    mutate(year = as.character(year)) %>%
+    rename(Year = year) %>%
+    ggplot(aes(x = mean_q, y = cumul_er, color = Year)) +
+    geom_point() +
+    # geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.2) +
+    # geom_errorbarh(aes(xmin = xmin, xmax = xmax), height = 0.2) +
+    # scale_shape_manual(values = c(19,21)) +
+    scale_color_manual(values = c("2017" = vcol[1], "2018" = vcol[2], "2019" = vcol[3])) +
+    xlab(expression('Fall Discharge (m'^3 * s^-1 * ')'))+
+    ylab(expression("Cumul. Ann. ER (g O"[2] * "m"^-2 * ")")) +
+    theme_few()
+
+# dd %>%
+#     mutate(year = as.character(year)) %>%
+#     ggplot(aes(x = mean_q, y = mean_fall_er, color = year)) +
+#     geom_point() +
+#     scale_color_viridis_d()
+
+p2 <- dd %>%
+    mutate(year = as.character(year)) %>%
+    rename(Year = year) %>%
+    ggplot(aes(x = mean_q, y = m_temperature, color = Year)) +
+    geom_point() +
+    scale_color_manual(values = c("2017" = vcol[1], "2018" = vcol[2], "2019" = vcol[3])) +
+    xlab(expression('Fall Discharge (m'^3 * s^-1 * ')'))+
+    ylab(expression('Slope of Fall Water Temperature vs. ER')) +
+    theme_few()
+
+tiff(filename = 'figures/SI/annual_biplots.tiff',
+     width = 7, height = 4, units = 'in', res = 300)
+
+ggpubr::ggarrange(p1, p2, labels = c("a", "b"), label.x = 0.25, label.y = 0.95,
+                  align = 'h', common.legend = TRUE)
+
+dev.off()
+
+png(filename = 'figures/SI/annual_biplots.png',
+     width = 7, height = 4, units = 'in', res = 300)
+
+ggpubr::ggarrange(p1, p2, labels = c("a", "b"), label.x = 0.25, label.y = 0.95,
+                  align = 'h', common.legend = TRUE)
+
+dev.off()
