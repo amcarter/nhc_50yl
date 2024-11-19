@@ -886,16 +886,29 @@ mean_fall <- erseas %>%
               mean_fall_er = mean(ER, na.rm = TRUE),
               sd_fall_er = sd(ER, na.rm = TRUE))
 
-cumul_ann_resp <- erseas %>%
-    group_by(year) %>%
+cumul_ann_resp <- nhc_seasons %>%
+    select(-era) %>%
+    mutate(across(any_of(starts_with(c('GPP', 'ER'))),
+                  ~zoo::na.approx(., na.rm = F))) %>%
+    group_by(year = lubridate::year(date)) %>%
     summarize(cumul_er = sum(ER, na.rm = TRUE),
+              up_er = sum(ER.upper, na.rm = TRUE),
+              low_er = sum(ER.lower, na.rm = TRUE),
               sd_er = sd(ER, na.rm = TRUE))
 
 temp_slope <- er_table %>%
     filter(season == 3) %>%
-    select(year, m_temperature)
+    select(year, mean_temperature = m_temperature) %>%
+    mutate(sd_temperature = NA_real_)
+years <- c(2017, 2018, 2019)
+for(i in 1:3){
+    tmp <- gppseas %>% filter(season == 'Fall (Sep-Nov)', year == years[1],
+                      covariate == 'temperature')
+    temp_slope$sd_temperature[i] <- summary(lm(ER~value, data = tmp))$coefficients[2,2]
+}
 
 dd <- left_join(mean_fall, cumul_ann_resp, by = 'year') %>%
+# dd <- cumul_ann_resp %>%
     left_join(temp_slope, by = 'year')
 
 p1 <- dd %>%
@@ -903,8 +916,10 @@ p1 <- dd %>%
     rename(Year = year) %>%
     ggplot(aes(x = mean_q, y = cumul_er, color = Year)) +
     geom_point() +
-    # geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.2) +
-    # geom_errorbarh(aes(xmin = xmin, xmax = xmax), height = 0.2) +
+    # geom_errorbar(aes(ymin = cumul_er - (365*sqrt(sd_er))^2, ymax = cumul_er + 365*sd_er), width = 0.2) +
+    geom_errorbar(aes(ymin = up_er, ymax = low_er), width = 0.2) +
+    geom_errorbarh(aes(xmin = mean_q - sd_q, xmax = mean_q + sd_q),
+                    height = 150) +
     # scale_shape_manual(values = c(19,21)) +
     scale_color_manual(values = c("2017" = vcol[1], "2018" = vcol[2], "2019" = vcol[3])) +
     xlab(expression('Fall Discharge (m'^3 * s^-1 * ')'))+
@@ -920,17 +935,21 @@ p1 <- dd %>%
 p2 <- dd %>%
     mutate(year = as.character(year)) %>%
     rename(Year = year) %>%
-    ggplot(aes(x = mean_q, y = m_temperature, color = Year)) +
+    ggplot(aes(x = mean_q, y = mean_temperature, color = Year)) +
     geom_point() +
     scale_color_manual(values = c("2017" = vcol[1], "2018" = vcol[2], "2019" = vcol[3])) +
+    geom_errorbar(aes(ymin = mean_temperature - sd_temperature, ymax = mean_temperature + sd_temperature), width = 0.2) +
+    geom_errorbarh(aes(xmin = mean_q - sd_q, xmax = mean_q + sd_q),
+                    height = 0.1) +
     xlab(expression('Fall Discharge (m'^3 * s^-1 * ')'))+
-    ylab(expression('Slope of Fall Water Temperature vs. ER')) +
-    theme_few()
+    ylab(expression('Slope of Fall Water \nTemperature vs. ER')) +
+    theme_few() +
+    theme(plot.margin = unit(c(5,10,5,5), 'mm'))
 
 tiff(filename = 'figures/SI/annual_biplots.tiff',
      width = 7, height = 4, units = 'in', res = 300)
 
-ggpubr::ggarrange(p1, p2, labels = c("a", "b"), label.x = 0.25, label.y = 0.95,
+ggpubr::ggarrange(p1, p2, labels = c("a", "b"), #label.x = 0.25, label.y = 0.95,
                   align = 'h', common.legend = TRUE)
 
 dev.off()
@@ -938,7 +957,7 @@ dev.off()
 png(filename = 'figures/SI/annual_biplots.png',
      width = 7, height = 4, units = 'in', res = 300)
 
-ggpubr::ggarrange(p1, p2, labels = c("a", "b"), label.x = 0.25, label.y = 0.95,
+ggpubr::ggarrange(p1, p2, labels = c("a", "b"), #label.x = 0.25, label.y = 0.95,
                   align = 'h', common.legend = TRUE)
 
 dev.off()
