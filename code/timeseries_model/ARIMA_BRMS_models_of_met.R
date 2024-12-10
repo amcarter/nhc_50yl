@@ -282,13 +282,13 @@ hindcast_GPP <- data.frame(
 ############## model for ER
 
 bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*mean_log_Q + light)
-bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*med_log_Q + light)
+# bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*med_log_Q + light)
 get_prior(bform_ER, data = P_scaled)
 ER_priors <- c(prior("normal(0,5)", class = "b"),
                prior("normal(0,5)", class = "Intercept"),
                prior("cauchy(0,1)", class = "sigma"),
                prior("beta(1,1)", class = "ar", lb = 0, ub = 1))
-bmod_ER2 <- brm(bform_ER,
+bmod_ER <- brm(bform_ER,
                data = P_scaled,
                prior = ER_priors,
                chains = 4, cores = 4, iter = 4000,
@@ -299,7 +299,7 @@ bmod_ER2 <- brm(bform_ER,
 saveRDS(bmod_ER, 'data/timeseries_model_fits/brms_ER_mod.rds')
 bmod_ER <- readRDS('data/timeseries_model_fits/brms_ER_mod.rds')
 
-summary(bmod_ER2)
+summary(bmod_ER)
 
 png('figures/SI/BRMS_er_posterior_pred_check.png', width = 5, height = 4,
     units = 'in', res = 300)
@@ -740,7 +740,7 @@ hindcast <- data.frame(
 
 library(viridis)
 tiff('figures/change_in_annual_met_preds_through_time.tiff',
-     width = 5, height = 4, res = 300, units = 'in')
+     width = 6, height = 3.5, res = 300, units = 'in')
 hindcast %>%
     mutate(GPP = zoo::rollmean(GPP, k = 7, na.pad = TRUE)) %>%
     mutate(ER = -zoo::rollmean(ER, k = 7, na.pad = TRUE)) %>%
@@ -758,8 +758,12 @@ hindcast %>%
     scale_color_viridis(name = 'Year', option = 'C', begin = 0, end = 0.9) +
     facet_wrap(.~met, scales = 'free_y', ncol = 1, strip.position = 'right')+
     ylab(expression(paste('Metabolism (g ', O[2], m^-2, y^-1, ')'))) +
-    xlab('Day of year') +
-    theme_bw()
+    xlab('Month') +
+    scale_x_continuous(breaks = c(0,31,60,91,121,152,182,213,244,274,305,335),
+                       labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D")) +
+    theme_bw() +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank())
 dev.off()
 
 tiff('figures/Annual_hindcast_trajectory.tiff', width = 4, height = 3,

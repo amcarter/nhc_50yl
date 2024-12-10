@@ -97,7 +97,7 @@ cbp_mon <- bind_rows(cbp_mon, tmp) %>%
          #                                      TRUE ~ .)))
 
 tiff(filename = 'figures/metabolism_meansd_monthly_SM.tif',
-     height = 3.6, width = 6, units = 'in', res = 800)
+     height = 3, width = 6, units = 'in', res = 800)
 
 cbp_mon %>%
     mutate(n = case_when(era == "now" ~ NA_character_,
@@ -123,7 +123,7 @@ cbp_mon %>%
 dev.off()
 
 png(filename = 'figures/metabolism_meansd_monthly_SM.png',
-     height = 3.6, width = 6, units = 'in', res = 800)
+     height = 3, width = 6, units = 'in', res = 800)
 
 cbp_mon %>%
     mutate(n = case_when(era == "now" ~ NA_character_,
