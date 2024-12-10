@@ -208,8 +208,8 @@ qall <- sites %>%
   select(site = sitecode,
          wsarea = ws_area.km2,
          distance_m) %>%
-  mutate(oct9 = c(q$discharge_nhc[4], rep(NA, 5), q$discharge_unhc[4]),
-         mar7 = c(q$discharge_nhc[3], rep(NA, 5), q$discharge_unhc[3])) %>%
+  mutate(oct9 = c(q$discharge_nhc[4], rep(NA, 4), q$discharge_unhc[4]),
+         mar7 = c(q$discharge_nhc[3], rep(NA, 4), q$discharge_unhc[3])) %>%
   mutate(oct9 = na.approx(oct9, x = distance_m), # losing discharge interpolate with distance
          mar7 = na.approx(mar7, x = wsarea))
 
