@@ -600,7 +600,8 @@ fall_means <- nhc_fall1 %>%
 
 vcol <- viridis(begin = 0.1, end = 0.8, n = 3)
 
-cor1 <- round(cor(nhc_fall1$ER, log10(nhc_fall1$discharge)), 2)
+# cor1 <- round(cor(nhc_fall1$ER, log10(nhc_fall1$discharge)), 2)
+slope1 <- round(coef(lm(nhc_fall1$ER ~ log10(nhc_fall1$discharge)))[2], 2)
 
 qq <- nhc_fall1 %>%
     # left_join(select(fall_means, year, discharge_mean), by = 'year') %>%
@@ -623,7 +624,7 @@ qq <- nhc_fall1 %>%
                        labels = c(0.01, 0.1, 1)) +
     theme(legend.position = 'none',
           axis.title.y = element_blank()) +
-    geom_text(aes(x = 0, y = -7), label = paste('r = ', cor1), col = 'black', size = 3)
+    geom_text(aes(x = 0, y = -7), label = paste('s = ', slope1), col = 'black', size = 3)
 
 # q_dur <- nhc_fall1 %>%
 #     select(date, discharge) %>%
@@ -664,9 +665,12 @@ qq <- nhc_fall1 %>%
 #     geom_text(aes(x = 277, y = 0.05), label = "2019", col = '#619CFF', size = 3)+
 #     theme(legend.position = 'none')
 
-cor2 <- nhc_fall1 %>%
+# cor2 <- nhc_fall1 %>%
+#     group_by(year) %>%
+#     summarize(cor = round(cor(ER, temp.water), 2))
+slope2 <- nhc_fall1 %>%
     group_by(year) %>%
-    summarize(cor = round(cor(ER, log10(discharge)), 2))
+    summarize(slope = coef(lm(ER ~ temp.water))[2])
 
 tt <- ggplot(nhc_fall1, aes(temp.water, ER)) +
     # geom_point(size = 1.2) +
@@ -674,9 +678,9 @@ tt <- ggplot(nhc_fall1, aes(temp.water, ER)) +
     geom_smooth(aes(col = factor(year)),method = lm, se = F, linewidth = 0.5) +
     theme_bw() +
     scale_color_viridis_d(begin = 0.1, end = 0.8) +
-    geom_text(aes(x = 22.5, y = -11.9), label = paste('r =', pull(cor2[1, 2])), col = vcol[1], size = 3) +
-    geom_text(aes(x = 22, y = -1.5), label = paste('r =', pull(cor2[2, 2])), col = vcol[2], size = 3) +
-    geom_text(aes(x = 22, y = -7.8), label = paste('r =', pull(cor2[3, 2])), col = vcol[3], size = 3) +
+    geom_text(aes(x = 22.5, y = -11.9), label = paste('s =', round(pull(slope2[1, 2]), 2)), col = vcol[1], size = 3) +
+    geom_text(aes(x = 22, y = -1.5), label = paste('s =', round(pull(slope2[2, 2]), 2)), col = vcol[2], size = 3) +
+    geom_text(aes(x = 22.5, y = -7.1), label = paste('s =', round(pull(slope2[3, 2]), 2)), col = vcol[3], size = 3) +
     ylab(expression(paste("ER (g ", O[2], m^-2, d^-1, ")"))) +
     xlab(expression(paste("Water Temperature (",degree,"C)"))) +
     # ggtitle("Autumn Respiration Across Years (Oct - Nov)") +
