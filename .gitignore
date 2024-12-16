@@ -1,11 +1,4 @@
 
-
-
-
-
-
-
-
 .Rhistory
 *.doc
 .Rproj.user
@@ -14,6 +7,11 @@
 model/model_runs
 data/longitudinal_sampling
 data/watershed
+data/watershed_boundary
+data/nlcd
+data/nwalt
+data/other_watershed_stuff
+data/prism_raw
 data/metabolism/raw
 data/metabolism/modeled
 data/metabolism/processed

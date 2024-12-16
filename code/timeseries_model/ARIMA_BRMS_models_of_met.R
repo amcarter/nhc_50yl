@@ -842,7 +842,7 @@ met_plot <- hindcast %>%
 
 # tiff('figures/change_in_annual_met_preds_through_time.tiff',
 #      width = 6, height = 3.5, res = 300, units = 'in')
-# met_plot
+met_plot
 # dev.off()
 
 met_change3 <- met_change2 %>%
