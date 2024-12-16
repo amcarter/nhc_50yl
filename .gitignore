@@ -4,6 +4,8 @@ data
 !data/map_files
 !data/watershed_boundary
 !data/tables
+!data/rating_curves
+!data/timeseries_model_fits
 .Rhistory
 *.doc
 .Rproj.user
