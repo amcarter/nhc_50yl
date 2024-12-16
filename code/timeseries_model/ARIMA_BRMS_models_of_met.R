@@ -33,7 +33,10 @@ P <- dat %>%
     group_by(site) %>%
     left_join(select(sites, site = sitecode, slope = slope_nhd)) %>%
     filter(site %in% c('CBP', 'NHC')) %>%
-    mutate(log_Q = log(discharge),
+    mutate(light = case_when(light == 0 ~ NA_real_,
+                             TRUE ~ light)) %>%
+    mutate(log_light = log(light),
+           log_Q = log(discharge),
            diff_Q = c(NA, diff(log_Q)),
            RBI_7 = NA_real_,
            year = lubridate::year(date),
@@ -43,7 +46,7 @@ P <- dat %>%
 
 for(s in c('NHC', 'CBP')){
     P1 <- P[P$site == s,] %>%
-        mutate(log_Q = na.approx(log_Q, na.rm = FALSE))
+        mutate(log_Q = zoo::na.approx(log_Q, na.rm = FALSE))
     for(i in 8:nrow(P1)){
         P1$RBI_7[i] = sum(abs(P1$diff_Q[(i-6):i]))/7
     }
@@ -60,7 +63,7 @@ P <- left_join(P, Q_sum, by = c('site', 'year'))
 
 scaling_pars <- P %>%
     ungroup() %>%
-    summarize(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
+    summarize(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'log_light', 'temp.water'),
                      .fns = c(mean = \(x) mean(x, na.rm = TRUE),
                               sd = \(x) sd(x, na.rm = TRUE))))
 
@@ -73,7 +76,7 @@ epsilon = 1e-1
 
 P_scaled <- P %>%
     ungroup() %>%
-    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
+    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'log_light', 'temp.water'),
                   .fns = \(x) as.vector(scale(x))),
            GPP = GPP + epsilon,
            ER = -ER + epsilon,
@@ -82,19 +85,19 @@ P_scaled <- P %>%
                            TRUE ~ 0)) %>%
     slice(-c(1, 362:386, 1506)) # remove leading and ending NA's in metabolism from each site
 
-P_scaled <- P %>%
-    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
-                  .fns = \(x) as.vector(scale(x))),
-           sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
-           cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
-           month = month(date),
-           season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
-                              month %in% c(3, 4, 5) ~ 'Spring',
-                              month %in% c(6, 7, 8) ~ 'Summer',
-                              month %in% c(9, 10, 11) ~ 'Fall'),
-           GPP = GPP + epsilon,
-           ER = -ER + epsilon,
-           site = factor(site, levels = c("CBP", "NHC")))
+# P_scaled <- P %>%
+#     mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
+#                   .fns = \(x) as.vector(scale(x))),
+#            sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
+#            cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
+#            month = month(date),
+#            season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
+#                               month %in% c(3, 4, 5) ~ 'Spring',
+#                               month %in% c(6, 7, 8) ~ 'Summer',
+#                               month %in% c(9, 10, 11) ~ 'Fall'),
+#            GPP = GPP + epsilon,
+#            ER = -ER + epsilon,
+#            site = factor(site, levels = c("CBP", "NHC")))
 
 # plot(density(log(P_scaled$GPP), na.rm = T))
 # plot(density(log(-P_scaled$ER), na.rm = T))
@@ -136,19 +139,19 @@ hall_preds <- hall_QT %>%
            site = factor(site, levels = c("CBP", "NHC"))) %>%
     slice_head(n = -4)
 
-hall_preds <- hall_QT %>%
-    dplyr::select(date, site,  temp.water = water_temp_C, log_Q, diff_Q, RBI_7, light) %>%
-    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
-                  .fns = \(x) zoo::na.approx(x, na.rm = F)),
-           sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
-           cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
-           month = month(date),
-           season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
-                              month %in% c(3, 4, 5) ~ 'Spring',
-                              month %in% c(6, 7, 8) ~ 'Summer',
-                              month %in% c(9, 10, 11) ~ 'Fall'),
-           site = factor(site, levels = c("CBP", "NHC"))) %>%
-    slice_head(n = -4)
+# hall_preds <- hall_QT %>%
+#     dplyr::select(date, site,  temp.water = water_temp_C, log_Q, diff_Q, RBI_7, light) %>%
+#     mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
+#                   .fns = \(x) zoo::na.approx(x, na.rm = F)),
+#            sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
+#            cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
+#            month = month(date),
+#            season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
+#                               month %in% c(3, 4, 5) ~ 'Spring',
+#                               month %in% c(6, 7, 8) ~ 'Summer',
+#                               month %in% c(9, 10, 11) ~ 'Fall'),
+#            site = factor(site, levels = c("CBP", "NHC"))) %>%
+#     slice_head(n = -4)
 
 hall_preds$med_log_Q = Q_sum_hall$med_log_Q
 hall_preds$mean_log_Q = Q_sum_hall$mean_log_Q
@@ -165,7 +168,7 @@ hall_scaled <- hall_preds %>%
 ################################################################################
 
 # try with brms:
-
+library(brms)
 P_scaled <- P_scaled %>%
     mutate(log_GPP = log(GPP),
            log_ER = log(ER))
@@ -206,6 +209,30 @@ lines(density(P_scaled$log_GPP, na.rm = T))
 
 dev.off()
 
+library(modelr)
+library(tidybayes)
+
+P_scaled <- P_scaled %>%
+    mutate(siteyear = paste(site, year, sep = " "))
+
+png('figures/SI/BRMS_gpp_model_fit.png', width = 7.5, height = 7,
+    units = 'in', res = 300)
+P_scaled %>%
+    group_by(siteyear) %>%
+    add_epred_draws(bmod_GPP, ndraws = 100) %>%
+    mutate(.epred = exp(.epred + epsilon)) %>%
+    ggplot(aes(date, GPP)) +
+    stat_lineribbon(aes(y = .epred)) +
+    # geom_line(aes(y = .epred, group = paste(siteyear, .draw)), alpha = .1) +
+    geom_point(data = P_scaled, col = '#4F716B') +
+    scale_fill_brewer(palette = "Greys") +
+    facet_wrap(.~siteyear, scales = 'free', ncol = 1, strip.position = 'right')+
+    ylab(expression(paste('GPP (g ', O[2], m^-2, d^-1, ')'))) +
+    xlab('Date')+
+    theme_bw()
+
+dev.off()
+
 draws_fit <- as_draws_array(bmod_GPP)
 GPP_pars <- posterior::summarize_draws(draws_fit) %>%
     filter(variable %in%  c('b_Intercept', 'b_temp.water', 'b_light',
@@ -233,7 +260,9 @@ post_preds[, 1] <- matrix(
     rep(log(mean(hall$GPP, na.rm = T) + epsilon), each = draws),
     nrow = draws, ncol = 1
 )
+
 post_preds_err <- post_preds
+
 
 for(i in 1:draws){
     for(t in 2:nrow(hall_scaled)){
@@ -249,6 +278,7 @@ for(i in 1:draws){
 }
 
 
+
 hindcast_GPP <- data.frame(
     date = hall_scaled$date,
     GPP_pred = apply(post_preds, 2, mean),
@@ -262,6 +292,7 @@ hindcast_GPP <- data.frame(
            GPP_high = exp(GPP_high - epsilon),
            GPP_err_low = exp(GPP_err_low)- epsilon,
            GPP_err_high = exp(GPP_err_high - epsilon))
+
 
 # ggplot(hindcast_GPP, aes(date, GPP), col = 2) +
 #     geom_ribbon(aes(ymin = GPP_err_low, ymax = GPP_err_high),
@@ -318,7 +349,23 @@ lines(density(P_scaled$log_ER, na.rm = T))
 
 dev.off()
 
+png('figures/SI/BRMS_er_model_fit.png', width = 7.5, height = 7,
+    units = 'in', res = 300)
+P_scaled %>%
+    group_by(siteyear) %>%
+    add_epred_draws(bmod_ER, ndraws = 100) %>%
+    mutate(.epred = exp(.epred + epsilon)) %>%
+    ggplot(aes(date, ER)) +
+    stat_lineribbon(aes(y = .epred)) +
+    # geom_line(aes(y = .epred, group = paste(siteyear, .draw)), alpha = .1) +
+    geom_point(data = P_scaled, col = '#A2865C') +
+    scale_fill_brewer(palette = "Greys") +
+    facet_wrap(.~siteyear, scales = 'free', ncol = 1, strip.position = 'right')+
+    ylab(expression(paste('ER (g ', O[2], m^-2, d^-1, ')'))) +
+    xlab('Date')+
+    theme_bw()
 
+dev.off()
 # args_y <- list(bmod_ER)
 # args_ypred <- list(bmod_ER)
 #
@@ -539,7 +586,7 @@ dev.off()
 # compare the predictions averaged across months like in Hall 1972
 hall_pred_sum <- hindcast %>%
     mutate(month = month(date)) %>%
-    group_by(month) %>%
+    # group_by(month) %>%
     summarize(across(starts_with(c('GPP','ER')),
                      .fns = c(mean = \(x) mean(x, na.rm = T),
                               sd = \(x) sd(x, na.rm = T)))) %>%
@@ -662,6 +709,10 @@ Q_sum <- met_change %>%
     filter(lubridate::month(date) %in% c(9, 10, 11)) %>%
     summarize(mean_log_Q = mean(log_Q, na.rm = T))
 
+Q_sum2 <- read_csv('data/rating_curves/modeled_fall_mean_NHC_flow.csv') %>%
+    mutate(mean_log_Q = log(fall_mean))
+
+
 met_change_scaled <- met_change %>%
     left_join(Q_sum, by = 'year') %>%
     select(-temp_C) %>%
@@ -669,7 +720,19 @@ met_change_scaled <- met_change %>%
            light = (light - scaling_pars$light_mean)/scaling_pars$light_sd,
            temp.water = (temp.water - scaling_pars$temp.water_mean)/scaling_pars$temp.water_sd)
 
+met_change_scaled <- met_change %>%
+    right_join(Q_sum2, by = 'year') %>%
+    select(-temp_C) %>%
+    mutate(log_Q = (log_Q - scaling_pars$log_Q_mean)/scaling_pars$log_Q_sd,
+           light = (light - scaling_pars$light_mean)/scaling_pars$light_sd,
+           temp.water = (temp.water - scaling_pars$temp.water_mean)/scaling_pars$temp.water_sd)
 
+met_change2 <- met_change %>%
+    group_by(year) %>%
+    summarize(temp.water = mean(temp.water, na.rm = T))%>%
+    right_join(Q_sum2, by = 'year')  %>%
+    mutate(mean_Q = exp(mean_log_Q)) %>%
+    ungroup()
 
 # matrix of draws from the posterior-predictive distribution
 post_preds_GPP <- matrix(nrow = draws, ncol = nrow(met_change_scaled))
@@ -745,31 +808,73 @@ hindcast <- data.frame(
 
 
 library(viridis)
-tiff('figures/change_in_annual_met_preds_through_time.tiff',
-     width = 6, height = 3.5, res = 300, units = 'in')
-hindcast %>%
+met_plot <- hindcast %>%
     mutate(GPP = zoo::rollmean(GPP, k = 7, na.pad = TRUE)) %>%
     mutate(ER = -zoo::rollmean(ER, k = 7, na.pad = TRUE)) %>%
-    group_by(doy) %>%
-    mutate(GPP = zoo::rollmean(GPP, k = 5, na.pad = TRUE)) %>%
-    mutate(ER = zoo::rollmean(ER, k = 5, na.pad = TRUE)) %>%
+    # group_by(doy) %>%
+    # mutate(GPP = zoo::rollmean(GPP, k = 5, na.pad = TRUE)) %>%
+    # mutate(ER = zoo::rollmean(ER, k = 5, na.pad = TRUE)) %>%
     pivot_longer(cols = c('GPP', 'ER'),
                  names_to = 'met',
                  values_to = 'gO2') %>%
-    filter(year %% 5 == 2) %>%
+    filter(year %% 3 == 1) %>%
     mutate(met = factor(met, levels = c('GPP', 'ER'))) %>%
     ggplot(aes(doy, gO2, col = year, group = factor(year))) +
     geom_line(linewidth = 0.7) +
     # geom_line(aes(y = -ER), linewidth = 1) +
     scale_color_viridis(name = 'Year', option = 'C', begin = 0, end = 0.9) +
     facet_wrap(.~met, scales = 'free_y', ncol = 1, strip.position = 'right')+
-    ylab(expression(paste('Metabolism (g ', O[2], m^-2, y^-1, ')'))) +
+    ylab(expression(paste('ER (g ', O[2], m^-2, y^-1, ')                    GPP (g ', O[2], m^-2, y^-1, ')'))) +
     xlab('Month') +
     scale_x_continuous(breaks = c(0,31,60,91,121,152,182,213,244,274,305,335),
                        labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D")) +
     theme_bw() +
     theme(panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank())
+          panel.grid.minor = element_blank(),
+          strip.background = element_blank(),
+          strip.text = element_blank(),
+          # legend.key.width = unit(0.3, 'in'),
+          legend.position = 'inside',
+          legend.position.inside = c(.09, .18))
+          # legend.direction = 'horizontal')
+          # legend.position = 'top')
+
+
+# tiff('figures/change_in_annual_met_preds_through_time.tiff',
+#      width = 6, height = 3.5, res = 300, units = 'in')
+# met_plot
+# dev.off()
+
+met_change3 <- met_change2 %>%
+    rename(`Mean Fall Discharge` = mean_Q, `Mean Annual Temperature` = temp.water) %>%
+    pivot_longer(cols = c('Mean Fall Discharge', 'Mean Annual Temperature'),
+                 names_to = 'variable', values_to = 'value')
+met_dot <- filter(met_change3, year %% 3 == 1)
+clim_plot <- met_change3 %>%
+    ggplot(aes(year, value, col = year)) +
+    geom_line(linewidth = 1) +
+    geom_point(data = met_dot, size = 2) +
+    geom_point(data = met_dot, col = 'black', pch = 1, size = 2) +
+    scale_color_viridis(name = 'Year', option = 'C', begin = 0, end = 0.9) +
+    facet_wrap(.~variable, scales = 'free_y', ncol = 1) +
+    xlab('year') +
+    ylab(expression(paste('Mean Fall Discharge (', m^3, s^-1, ')           Mean Annual Temp. (', degree, 'C)')))+
+    theme_bw() +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          strip.background = element_blank(),
+          strip.text = element_blank(),
+          legend.key.width = unit(0.5, 'in'),
+          legend.position = 'none')
+
+
+tiff('figures/Annual_hindcast_trajectory_4panel.tiff', width = 9, height = 5,
+     units = 'in', res = 300)
+ggpubr::ggarrange(met_plot, clim_plot, widths = c(2,1))#, common.legend = TRUE )
+dev.off()
+png('figures/Annual_hindcast_trajectory_4panel.png', width = 9, height = 5,
+     units = 'in', res = 300)
+ggpubr::ggarrange(met_plot, clim_plot, widths = c(2,1))#, common.legend = TRUE )
 dev.off()
 
 tiff('figures/Annual_hindcast_trajectory.tiff', width = 4, height = 3,
@@ -827,7 +932,7 @@ P_scaled$fit_se <- fitted_values$se.fit
 ggplot(P_scaled, aes(x = date, y = GPP)) +
     geom_point(color = "blue", alpha = 0.6) +  # Original data points
     geom_line(aes(y = fitted_values), color = "red", linewidth = 1) +  # Fitted values from the model
-    geom_ribbon(aes(ymin = fitted_values - 2*fit_se,
+	geom_ribbon(aes(ymin = fitted_values - 2*fit_se,
                     ymax = fitted_values + 2*fit_se))+
     labs(title = "GAM Fit to Original Data",
          x = "Temperature (Water)",
