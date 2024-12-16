@@ -173,6 +173,7 @@ P_scaled <- P_scaled %>%
 bform_GPP <- bf(log_GPP | mi() ~ ar(p = 1) + (1|site) + temp.water + light)
 get_prior(bform_GPP, data = P_scaled)
 GPP_priors <- c(prior("normal(0,5)", class = "b"),
+                prior("normal(0,0.2)", class = "b", coef = "temp.water"),
                 prior("beta(1,1)", class = "ar", lb = 0, ub = 1),
                 prior("normal(0,5)", class = "Intercept"),
                 prior("cauchy(0,1)", class = "sigma"))
@@ -187,7 +188,7 @@ bmod_GPP <- brm(bform_GPP,
 
 # evaluate model fit:
 saveRDS(bmod_GPP, 'data/timeseries_model_fits/brms_GPP_mod.rds')
-bmod_GPP <- readRDS('data/timeseries_model_fits/brms_GPP_mod.rds')
+# bmod_GPP <- readRDS('data/timeseries_model_fits/brms_GPP_mod.rds')
 
 summary(bmod_GPP)
 
@@ -284,7 +285,9 @@ hindcast_GPP <- data.frame(
 bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*mean_log_Q + light)
 # bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*med_log_Q + light)
 get_prior(bform_ER, data = P_scaled)
-ER_priors <- c(prior("normal(0,5)", class = "b"),
+ER_priors <- c(prior("normal(0,1)", class = "b"),
+               prior("normal(0,5)", class = "b", coef = "light"),
+               prior("normal(0,0.2)", class = "b", coef = "temp.water"),
                prior("normal(0,5)", class = "Intercept"),
                prior("cauchy(0,1)", class = "sigma"),
                prior("beta(1,1)", class = "ar", lb = 0, ub = 1))
@@ -297,7 +300,7 @@ bmod_ER <- brm(bform_ER,
                               max_treedepth = 14))
 
 saveRDS(bmod_ER, 'data/timeseries_model_fits/brms_ER_mod.rds')
-bmod_ER <- readRDS('data/timeseries_model_fits/brms_ER_mod.rds')
+# bmod_ER <- readRDS('data/timeseries_model_fits/brms_ER_mod.rds')
 
 summary(bmod_ER)
 
@@ -548,6 +551,9 @@ hall_sum <- hall %>%
                      .fns = c(mean = \(x) mean(x, na.rm = T),
                               sd = \(x) sd(x, na.rm = T)))) %>%
     ungroup()
+
+hind_sum <- filter(hindcast, year(date) == 1969) %>%
+    arrange(date)
 
 # tiff('figures/BRMS_hindcast_comparison_monthly.tiff', width = 7.5, height = 4,
 #      units = 'in', res = 300)
