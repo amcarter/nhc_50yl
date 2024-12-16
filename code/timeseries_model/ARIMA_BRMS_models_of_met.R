@@ -175,8 +175,8 @@ P_scaled <- P_scaled %>%
 
 bform_GPP <- bf(log_GPP | mi() ~ ar(p = 1) + (1|site) + temp.water + light)
 get_prior(bform_GPP, data = P_scaled)
-GPP_priors <- c(prior("normal(0,5)", class = "b", coef = "light"),
-                prior("normal(0,1)", class = "b", coef = "temp.water"),
+GPP_priors <- c(prior("normal(0,5)", class = "b"),
+                prior("normal(0,0.2)", class = "b", coef = "temp.water"),
                 prior("beta(1,1)", class = "ar", lb = 0, ub = 1),
                 prior("normal(0,5)", class = "Intercept"),
                 prior("cauchy(0,1)", class = "sigma"))
@@ -317,8 +317,8 @@ bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*mean_log_Q + li
 # bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*med_log_Q + light)
 get_prior(bform_ER, data = P_scaled)
 ER_priors <- c(prior("normal(0,1)", class = "b"),
-               prior("normal(0,1)", class = "b", coef = "temp.water"),
                prior("normal(0,5)", class = "b", coef = "light"),
+               prior("normal(0,0.2)", class = "b", coef = "temp.water"),
                prior("normal(0,5)", class = "Intercept"),
                prior("cauchy(0,1)", class = "sigma"),
                prior("beta(1,1)", class = "ar", lb = 0, ub = 1))
@@ -932,7 +932,7 @@ P_scaled$fit_se <- fitted_values$se.fit
 ggplot(P_scaled, aes(x = date, y = GPP)) +
     geom_point(color = "blue", alpha = 0.6) +  # Original data points
     geom_line(aes(y = fitted_values), color = "red", linewidth = 1) +  # Fitted values from the model
-    geom_ribbon(aes(ymin = fitted_values - 2*fit_se,
+	geom_ribbon(aes(ymin = fitted_values - 2*fit_se,
                     ymax = fitted_values + 2*fit_se))+
     labs(title = "GAM Fit to Original Data",
          x = "Temperature (Water)",
