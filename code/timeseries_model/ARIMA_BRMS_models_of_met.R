@@ -33,7 +33,10 @@ P <- dat %>%
     group_by(site) %>%
     left_join(select(sites, site = sitecode, slope = slope_nhd)) %>%
     filter(site %in% c('CBP', 'NHC')) %>%
-    mutate(log_Q = log(discharge),
+    mutate(light = case_when(light == 0 ~ NA_real_,
+                             TRUE ~ light)) %>%
+    mutate(log_light = log(light),
+           log_Q = log(discharge),
            diff_Q = c(NA, diff(log_Q)),
            RBI_7 = NA_real_,
            year = lubridate::year(date),
@@ -60,7 +63,7 @@ P <- left_join(P, Q_sum, by = c('site', 'year'))
 
 scaling_pars <- P %>%
     ungroup() %>%
-    summarize(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
+    summarize(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'log_light', 'temp.water'),
                      .fns = c(mean = \(x) mean(x, na.rm = TRUE),
                               sd = \(x) sd(x, na.rm = TRUE))))
 
@@ -73,7 +76,7 @@ epsilon = 1e-1
 
 P_scaled <- P %>%
     ungroup() %>%
-    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
+    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'log_light', 'temp.water'),
                   .fns = \(x) as.vector(scale(x))),
            GPP = GPP + epsilon,
            ER = -ER + epsilon,
@@ -82,19 +85,19 @@ P_scaled <- P %>%
                            TRUE ~ 0)) %>%
     slice(-c(1, 362:386, 1506)) # remove leading and ending NA's in metabolism from each site
 
-P_scaled <- P %>%
-    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
-                  .fns = \(x) as.vector(scale(x))),
-           sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
-           cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
-           month = month(date),
-           season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
-                              month %in% c(3, 4, 5) ~ 'Spring',
-                              month %in% c(6, 7, 8) ~ 'Summer',
-                              month %in% c(9, 10, 11) ~ 'Fall'),
-           GPP = GPP + epsilon,
-           ER = -ER + epsilon,
-           site = factor(site, levels = c("CBP", "NHC")))
+# P_scaled <- P %>%
+#     mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
+#                   .fns = \(x) as.vector(scale(x))),
+#            sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
+#            cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
+#            month = month(date),
+#            season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
+#                               month %in% c(3, 4, 5) ~ 'Spring',
+#                               month %in% c(6, 7, 8) ~ 'Summer',
+#                               month %in% c(9, 10, 11) ~ 'Fall'),
+#            GPP = GPP + epsilon,
+#            ER = -ER + epsilon,
+#            site = factor(site, levels = c("CBP", "NHC")))
 
 # plot(density(log(P_scaled$GPP), na.rm = T))
 # plot(density(log(-P_scaled$ER), na.rm = T))
@@ -136,19 +139,19 @@ hall_preds <- hall_QT %>%
            site = factor(site, levels = c("CBP", "NHC"))) %>%
     slice_head(n = -4)
 
-hall_preds <- hall_QT %>%
-    dplyr::select(date, site,  temp.water = water_temp_C, log_Q, diff_Q, RBI_7, light) %>%
-    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
-                  .fns = \(x) zoo::na.approx(x, na.rm = F)),
-           sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
-           cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
-           month = month(date),
-           season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
-                              month %in% c(3, 4, 5) ~ 'Spring',
-                              month %in% c(6, 7, 8) ~ 'Summer',
-                              month %in% c(9, 10, 11) ~ 'Fall'),
-           site = factor(site, levels = c("CBP", "NHC"))) %>%
-    slice_head(n = -4)
+# hall_preds <- hall_QT %>%
+#     dplyr::select(date, site,  temp.water = water_temp_C, log_Q, diff_Q, RBI_7, light) %>%
+#     mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
+#                   .fns = \(x) zoo::na.approx(x, na.rm = F)),
+#            sin_time = sin(2*pi *as.numeric(format(date, '%j'))/365),
+#            cos_time = cos(2*pi *as.numeric(format(date, '%j'))/365),
+#            month = month(date),
+#            season = case_when(month %in% c(12, 1, 2) ~ 'Winter',
+#                               month %in% c(3, 4, 5) ~ 'Spring',
+#                               month %in% c(6, 7, 8) ~ 'Summer',
+#                               month %in% c(9, 10, 11) ~ 'Fall'),
+#            site = factor(site, levels = c("CBP", "NHC"))) %>%
+#     slice_head(n = -4)
 
 hall_preds$med_log_Q = Q_sum_hall$med_log_Q
 hall_preds$mean_log_Q = Q_sum_hall$mean_log_Q
@@ -172,7 +175,8 @@ P_scaled <- P_scaled %>%
 
 bform_GPP <- bf(log_GPP | mi() ~ ar(p = 1) + (1|site) + temp.water + light)
 get_prior(bform_GPP, data = P_scaled)
-GPP_priors <- c(prior("normal(0,5)", class = "b"),
+GPP_priors <- c(prior("normal(0,5)", class = "b", coef = "light"),
+                prior("normal(0,1)", class = "b", coef = "temp.water"),
                 prior("beta(1,1)", class = "ar", lb = 0, ub = 1),
                 prior("normal(0,5)", class = "Intercept"),
                 prior("cauchy(0,1)", class = "sigma"))
@@ -187,7 +191,7 @@ bmod_GPP <- brm(bform_GPP,
 
 # evaluate model fit:
 saveRDS(bmod_GPP, 'data/timeseries_model_fits/brms_GPP_mod.rds')
-bmod_GPP <- readRDS('data/timeseries_model_fits/brms_GPP_mod.rds')
+# bmod_GPP <- readRDS('data/timeseries_model_fits/brms_GPP_mod.rds')
 
 summary(bmod_GPP)
 
@@ -312,7 +316,9 @@ hindcast_GPP <- data.frame(
 bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*mean_log_Q + light)
 # bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*med_log_Q + light)
 get_prior(bform_ER, data = P_scaled)
-ER_priors <- c(prior("normal(0,5)", class = "b"),
+ER_priors <- c(prior("normal(0,1)", class = "b"),
+               prior("normal(0,1)", class = "b", coef = "temp.water"),
+               prior("normal(0,5)", class = "b", coef = "light"),
                prior("normal(0,5)", class = "Intercept"),
                prior("cauchy(0,1)", class = "sigma"),
                prior("beta(1,1)", class = "ar", lb = 0, ub = 1))
@@ -325,7 +331,7 @@ bmod_ER <- brm(bform_ER,
                               max_treedepth = 14))
 
 saveRDS(bmod_ER, 'data/timeseries_model_fits/brms_ER_mod.rds')
-bmod_ER <- readRDS('data/timeseries_model_fits/brms_ER_mod.rds')
+# bmod_ER <- readRDS('data/timeseries_model_fits/brms_ER_mod.rds')
 
 summary(bmod_ER)
 
@@ -580,7 +586,7 @@ dev.off()
 # compare the predictions averaged across months like in Hall 1972
 hall_pred_sum <- hindcast %>%
     mutate(month = month(date)) %>%
-    group_by(month) %>%
+    # group_by(month) %>%
     summarize(across(starts_with(c('GPP','ER')),
                      .fns = c(mean = \(x) mean(x, na.rm = T),
                               sd = \(x) sd(x, na.rm = T)))) %>%
@@ -592,6 +598,9 @@ hall_sum <- hall %>%
                      .fns = c(mean = \(x) mean(x, na.rm = T),
                               sd = \(x) sd(x, na.rm = T)))) %>%
     ungroup()
+
+hind_sum <- filter(hindcast, year(date) == 1969) %>%
+    arrange(date)
 
 # tiff('figures/BRMS_hindcast_comparison_monthly.tiff', width = 7.5, height = 4,
 #      units = 'in', res = 300)
