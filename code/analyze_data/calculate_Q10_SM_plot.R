@@ -138,7 +138,7 @@ met <- left_join(met,
 
 nhc <- met %>%
   filter(site %in% c('NHC', 'UNHC')) %>%
-  mutate(year = year(date),
+  mutate(year = lubridate::year(date),
          period = "Year")
 nhcf <-  nhc %>%
   filter(month %in% 9:11) %>%
@@ -151,7 +151,7 @@ nhcs <-  nhc %>%
 
 nhc_seasons <- met  %>%
   filter(site %in% c('NHC'), ! year %in% c(2016, 2020)) %>%
-  mutate(season = factor(case_when(month %in% c(1,2,12) ~ "Winter (Dec-Feb)",
+  mutate(Season = factor(case_when(month %in% c(1,2,12) ~ "Winter (Dec-Feb)",
                                    month %in% c(3:5) ~ "Spring (Mar-May)",
                                    month %in% c(6:8) ~ "Summer (Jun-Aug)",
                                    month %in% c(9:11) ~ "Fall (Sep-Nov)"),
@@ -165,7 +165,7 @@ png(filename = 'figures/ER_seasonal_rel.png',
 
 erseas <- nhc_seasons %>%
     mutate(discharge = log(discharge)) %>%
-    select(date, site, year, season, GPP, ER, NEP,
+    select(date, site, year, Season, GPP, ER, NEP,
            discharge, temperature = temp.water, LAI, light = PAR_surface) %>%
     mutate(light_mmol = light/1000) %>%
 pivot_longer(cols = c('discharge', 'temperature', 'light_mmol'),
@@ -174,7 +174,7 @@ pivot_longer(cols = c('discharge', 'temperature', 'light_mmol'),
 erseas$covariate <- factor(erseas$covariate, levels = c("light_mmol", "temperature", "discharge"))
 
 erseas %>%
-    ggplot(aes(value, ER, col = season)) +
+    ggplot(aes(value, ER, col = Season)) +
     geom_point(size = 1.2) +
     facet_grid(year~covariate, scales = 'free_x', labeller = label_parsed) +
     scale_shape_manual(values = c(19,21)) +
@@ -193,7 +193,7 @@ png(filename = 'figures/GPP_seasonal_rel.png',
 
 gppseas <- nhc_seasons %>%
     mutate(discharge = log(discharge)) %>%
-    select(date, site, year, season, GPP, ER, NEP,
+    select(date, site, year, Season, GPP, ER, NEP,
            discharge, temperature = temp.water, LAI, light = PAR_surface) %>%
     mutate(light_mmol = light/1000) %>%
 pivot_longer(cols = c('discharge', 'temperature', 'light_mmol'),
@@ -202,7 +202,7 @@ pivot_longer(cols = c('discharge', 'temperature', 'light_mmol'),
 gppseas$covariate <- factor(gppseas$covariate, levels = c("light_mmol", "temperature", "discharge"))
 
 gppseas %>%
-    ggplot(aes(value, GPP, col = season)) +
+    ggplot(aes(value, GPP, col = Season)) +
     geom_point(size = 1.2) +
     facet_grid(year~covariate, scales = 'free_x', labeller = label_parsed) +
     scale_shape_manual(values = c(19,21)) +
@@ -216,7 +216,38 @@ gppseas %>%
 
 dev.off()
 
-#
+gpp_plot <- gppseas %>%
+    ggplot(aes(value, GPP, col = Season)) +
+    geom_point(size = 1.2) +
+    facet_grid(year~covariate, scales = 'free_x', labeller = label_parsed) +
+    scale_shape_manual(values = c(19,21)) +
+    xlab(expression(paste("PAR (mmol ", m^-2, s^-1, ")     Temp (", degree, 'C)          Log Q (', m^3, s^-1, ")")))+
+    ylab(expression("GPP (g O"[2] * "m"^-2 * "d"^-1 * ")")) +
+    theme_bw() +
+    theme(
+        strip.background.x = element_blank(),         # Remove strip background
+        strip.text.x = element_blank(),             # Remove x-axis facet labels
+        strip.background.y = element_blank(),         # Remove strip background
+        strip.text.y = element_blank()             # Remove x-axis facet labels
+    )
+
+er_plot <- erseas %>%
+    ggplot(aes(value, ER, col = Season)) +
+    geom_point(size = 1.2) +
+    facet_grid(year~covariate, scales = 'free_x', labeller = label_parsed) +
+    scale_shape_manual(values = c(19,21)) +
+    xlab(expression(paste("PAR (mmol ", m^-2, s^-1, ")     Temp (", degree, 'C)          Log Q (', m^3, s^-1, ")")))+
+    ylab(expression("ER (g O"[2] * "m"^-2 * "d"^-1 * ")")) +
+    theme_bw() +
+    theme(
+        strip.background.x = element_blank(),         # Remove strip background
+        strip.text.x = element_blank()             # Remove x-axis facet labels
+    )
+
+png(filename = 'figures/GPP_ER_seasonal_rel.png',
+     height = 5.5, width = 9, units = 'in', res = 300)
+  ggpubr::ggarrange(gpp_plot, er_plot, common.legend = T, widths = c(0.9, 1))
+dev.off()
 # gppseas %>%
 #     ggplot(aes(value, GPP, col = season)) +
 #     geom_point(size = 1.2) +
