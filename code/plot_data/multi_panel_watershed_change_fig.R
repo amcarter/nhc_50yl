@@ -3,6 +3,7 @@
 
 library(tidyverse)
 library(zoo)
+library(lubridate)
 
 nldas <- read_csv("data/watershed/nldas.csv") %>%
   dplyr::select(datetime = DateTime, value = '1', variable) %>%
@@ -298,7 +299,7 @@ precip_col ='steelblue'
 dat_col = 'grey25'
 prod_col = 'forestgreen'
 
-m <- cbind(c(1,1,2,2,3,3,4,4))
+m <- cbind(c(1, 1, 2, 2, 3, 3, 4, 4, 5, 5))
 layout(m)
 library(forecast)
 #air
@@ -345,7 +346,7 @@ text(1970, 75, 'slope = 2.97 ± 0.06%/decade', col = precip_col, cex = 1)
 #no precip days
 m_ar1 <- forecast::Arima(cc$zero_days, order = c(1, 0, 0), xreg = matrix(cc$year, ncol = 1))
 plot(cc$year, cc$zero_days, type = 'l', lwd = 1.2, col = precip_col, axes = F)
-axis(1, padj = -0.5)
+# axis(1, padj = -0.5)
 axis(2, las = 2)#, at = c(60, 70, 80), labels = c('60%', '70%', '80%'))
 mtext('No Precip Days', 2, 2.7, cex = .8)
 mm <- lm(zero_days~year, data = cc)
@@ -354,6 +355,35 @@ lines(1979:2019, conf_interval$fit, col = precip_col)
 polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
         col = alpha(precip_col, .3), border = NA)
 text(1970, 220, 'slope = 12.1 ± 0.2 days/decade', col = precip_col, cex = 1)
-rect(1967, 152.5,2020,537,xpd = NA)
+rect(1967, 56.2, 2020, 537, xpd = NA)
+
+drought_col <- "firebrick3"
+d <- read_csv("data/other_watershed_stuff/PDSI_timeseries.csv")
+zz <- d %>%
+  select(date, pdsi) %>%
+  mutate(pdsi = pdsi * 0.01) %>%
+  filter(
+    month(date) %in% 9:11,
+    year(date) %in% 1968:2019
+  ) %>%
+  group_by(year = year(date)) %>%
+  summarize(pdsi = mean(pdsi))
+
+pdsi <- forecast::Arima(zz$pdsi, order = c(1, 0, 0), xreg = matrix(zz$year, ncol = 1))
+plot(zz$year, zz$pdsi, type = "l", lwd = 1.2, col = drought_col, axes = F)
+axis(1, padj = -0.5)
+axis(2, las = 2) # , at = c(60, 70, 80), labels = c('60%', '70%', '80%'))
+mtext("PDSI", 2, 2.7, cex = .8)
+mm <- lm(pdsi ~ year, data = zz)
+# conf_interval <- data.frame(predict(mm, interval = "confidence", level = 0.95))
+# lines(1968:2019, conf_interval$fit, col = drought_col)
+# polygon(c(1968:2019, 2019:1968), c(conf_interval$lwr, ,rev(conf_interval$upr)),
+#   col = alpha(drought_col, .3), border = NA
+# )
+# text(1970, 220, "slope = 12.1 ± 0.2 days/decade", col = drought_col, cex = 1)
+# rect(1967, 152.5, 2020, 537, xpd = NA)
 
 dev.off()
+
+x <- 3
+x
