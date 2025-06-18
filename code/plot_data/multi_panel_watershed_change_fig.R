@@ -3,6 +3,7 @@
 
 library(tidyverse)
 library(zoo)
+library(lubridate)
 
 nldas <- read_csv("data/watershed/nldas.csv") %>%
   dplyr::select(datetime = DateTime, value = '1', variable) %>%
@@ -289,7 +290,7 @@ dev.off()
 
 
 dir.create('figures', showWarnings = FALSE)
-png("figures/Climate_Watershed_Multipanel_figure.png", width = 4, height = 3.5,
+png("figures/Climate_Watershed_Multipanel_figure2.png", width = 4, height = 4.2,
     units = 'in', res = 800, type = 'cairo')
 # tiff("figures/Climate_Watershed_Multipanel_figure.tif", width = 4, height = 5,
 #     units = 'in', res = 800, compression = 'lzw')
@@ -297,8 +298,9 @@ png("figures/Climate_Watershed_Multipanel_figure.png", width = 4, height = 3.5,
 precip_col ='steelblue'
 dat_col = 'grey25'
 prod_col = 'forestgreen'
+pt_yrs <- c(1968, 1969, 2019)
 
-m <- cbind(c(1,1,2,2,3,3,4,4))
+m <- cbind(c(1, 1, 2, 2, 3, 3, 4, 4, 5, 5))
 layout(m)
 library(forecast)
 #air
@@ -316,6 +318,7 @@ polygon(c(1968:2019, 2019:1968), c(conf_interval$lwr, rev(conf_interval$upr)),
         col = alpha(dat_col, .3), border = NA)
 axis(2, at = 14:17, labels = 14:17, las = 2)
 lines(cc$year, cc$min_mean, lwd = 1.2, col = dat_col)
+points(pt_yrs, cc$temp_mean[cc$year %in% pt_yrs], pch = 19, col = dat_col, cex = 1)
 mm <- lm(min_mean~year, data = cc)
 conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
 lines(1968:2019, conf_interval$fit, col = dat_col)
@@ -327,6 +330,7 @@ text(1982, 14.2, 'Daily mean, slope = 0.41 ± 0.06°C/decade', col = dat_col, ce
 #precip
 plot(cc$year, cc$cumulative_precip, type = 'l', lwd = 1.2, col = precip_col,
      axes = F, ylim = c(0.9, 1.7), xpd = NA, ylab = '', xlab = '')
+points(pt_yrs, cc$cumulative_precip[cc$year %in% pt_yrs], pch = 19, col = precip_col, cex = 1)
 axis(2, at = c(0.9, 1.3, 1.7), las = 2)
 mtext('Annual Precip (m)', 2, 2.7, cex = .8)
 
@@ -338,6 +342,7 @@ mtext('% Extreme', 2, 2.7, cex = .8)
 mm <- lm(percent_extreme~year, data = cc)
 conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
 lines(1979:2019, conf_interval$fit, col = precip_col)
+points(pt_yrs, cc$percent_extreme[cc$year %in% pt_yrs], pch = 19, col = precip_col, cex = 1)
 polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
         col = alpha(precip_col, .3), border = NA)
 text(1970, 75, 'slope = 2.97 ± 0.06%/decade', col = precip_col, cex = 1)
@@ -345,15 +350,45 @@ text(1970, 75, 'slope = 2.97 ± 0.06%/decade', col = precip_col, cex = 1)
 #no precip days
 m_ar1 <- forecast::Arima(cc$zero_days, order = c(1, 0, 0), xreg = matrix(cc$year, ncol = 1))
 plot(cc$year, cc$zero_days, type = 'l', lwd = 1.2, col = precip_col, axes = F)
-axis(1, padj = -0.5)
+# axis(1, padj = -0.5)
 axis(2, las = 2)#, at = c(60, 70, 80), labels = c('60%', '70%', '80%'))
 mtext('No Precip Days', 2, 2.7, cex = .8)
 mm <- lm(zero_days~year, data = cc)
 conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
 lines(1979:2019, conf_interval$fit, col = precip_col)
+points(pt_yrs, cc$zero_days[cc$year %in% pt_yrs], pch = 19, col = precip_col, cex = 1)
 polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
         col = alpha(precip_col, .3), border = NA)
 text(1970, 220, 'slope = 12.1 ± 0.2 days/decade', col = precip_col, cex = 1)
-rect(1967, 152.5,2020,537,xpd = NA)
+rect(1967, 56.2, 2020, 537, xpd = NA)
+
+drought_col <- "firebrick3"
+d <- read_csv("data/other_watershed_stuff/PDSI_timeseries.csv")
+zz <- d %>%
+  select(date, pdsi) %>%
+  mutate(pdsi = pdsi * 0.01) %>%
+  filter(
+    month(date) %in% 9:11,
+    year(date) %in% 1968:2019
+  ) %>%
+  group_by(year = year(date)) %>%
+  summarize(pdsi = mean(pdsi))
+
+pdsi <- forecast::Arima(zz$pdsi, order = c(1, 0, 0), xreg = matrix(zz$year, ncol = 1))
+plot(zz$year, zz$pdsi, type = "l", lwd = 1.2, col = drought_col, axes = F)
+points(pt_yrs, zz$pdsi[zz$year %in% pt_yrs], pch = 19, col = drought_col, cex = 1)
+axis(1, padj = -0.5)
+axis(2, las = 2) # , at = c(60, 70, 80), labels = c('60%', '70%', '80%'))
+mtext("PDSI", 2, 2.7, cex = .8)
+mm <- lm(pdsi ~ year, data = zz)
+# conf_interval <- data.frame(predict(mm, interval = "confidence", level = 0.95))
+# lines(1968:2019, conf_interval$fit, col = drought_col)
+# polygon(c(1968:2019, 2019:1968), c(conf_interval$lwr, ,rev(conf_interval$upr)),
+#   col = alpha(drought_col, .3), border = NA
+# )
+# text(1970, 220, "slope = 12.1 ± 0.2 days/decade", col = drought_col, cex = 1)
+# rect(1967, 152.5, 2020, 537, xpd = NA)
 
 dev.off()
+
+
