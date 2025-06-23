@@ -13,8 +13,8 @@ library(glue)
 library(rgee)
 
 #only for section 10
-# rgee::ee_Initialize(email = 'email here',
-#                     drive = TRUE)
+rgee::ee_Initialize(email = 'email here',
+                    drive = TRUE)
 
 rebuild_all = FALSE
 
@@ -1148,8 +1148,8 @@ write_csv(Glai, '~/git/papers/alice_nhc/data/gee/lai.csv')
 #precip (PRISM)
 Gppt = get_gee_chunk(gee_id = 'OREGONSTATE/PRISM/AN81d',
                      band = 'ppt',
-                     start = '1968-01-01',
-                     end = '2020-12-31',
+                     start = '1967-01-01',
+                     end = '2023-12-31',
                      res = 4000,
                      chunk_size_yr = 2,
                      wb = nhc_wb)
@@ -1158,7 +1158,7 @@ write_csv(Gppt, '~/git/papers/alice_nhc/data/gee/ppt.csv')
 #mean temp (PRISM)
 Gtmean = get_gee_chunk(gee_id = 'OREGONSTATE/PRISM/AN81d',
                      band = 'tmean',
-                     start = '1968-01-01',
+                     start = '1967-01-01',
                      end = '2020-12-31',
                      res = 4000,
                      chunk_size_yr = 2,

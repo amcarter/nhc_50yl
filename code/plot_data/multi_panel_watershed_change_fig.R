@@ -139,7 +139,6 @@ ws <- alldat %>%
   select(year, agriculture, developed, forested, grass_shrub,
          lai_max, NPP_mean, leaf_on_days, leaf_on, leaf_off)
 
-
 cc <- full_join(pp , air, by = 'year')%>%
   full_join(hydro, by = 'year') %>%
   filter(year !=2020,
@@ -147,6 +146,15 @@ cc <- full_join(pp , air, by = 'year')%>%
   select(-n,  -peak_Q, -ar_1) %>%
   arrange(year)
 summary(lm(cumulative~year, data = cc))
+
+prism_monthly_full <- read_csv('data/watershed/prism_annual.csv')
+cc <- cc %>%
+    rename(cp = cumulative_precip, tm = temp_mean) %>%
+    full_join(prism_monthly_full, by = 'year') %>%
+    arrange(year) %>%
+    select(-cp, -tm) %>%
+    mutate(cumulative_precip = cumulative_precip / 1000) %>%
+    filter(between(year, 1967, 2021))
 
 # png("figures/precip.png", width = 7.5, height = 6, units = "in", res = 300)
 # cc %>%
@@ -158,6 +166,8 @@ summary(lm(cumulative~year, data = cc))
 #   xlim(1986,2019)+
 #   theme_bw()
 # dev.off()
+
+
 
 # make multipanel figure (v1, obsolete) ####
 
@@ -290,7 +300,7 @@ dev.off()
 
 
 dir.create('figures', showWarnings = FALSE)
-png("figures/Climate_Watershed_Multipanel_figure2.png", width = 4, height = 4.2,
+png("figures/Climate_Watershed_Multipanel_figure3.png", width = 4, height = 4.2,
     units = 'in', res = 800, type = 'cairo')
 # tiff("figures/Climate_Watershed_Multipanel_figure.tif", width = 4, height = 5,
 #     units = 'in', res = 800, compression = 'lzw')
@@ -313,24 +323,24 @@ mm <- lm(temp_mean~year, data = cc)
 m_ar1 <- forecast::Arima(cc$temp_mean, order = c(1, 0, 0), xreg = matrix(cc$year, ncol = 1))
 conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
 # conf_interval <- predict(m_ar1, newxreg = cc$year)
-lines(1968:2019, conf_interval$fit, col = dat_col)
-polygon(c(1968:2019, 2019:1968), c(conf_interval$lwr, rev(conf_interval$upr)),
+lines(1967:2021, conf_interval$fit, col = dat_col)
+polygon(c(1967:2021, 2021:1967), c(conf_interval$lwr, rev(conf_interval$upr)),
         col = alpha(dat_col, .3), border = NA)
 axis(2, at = 14:17, labels = 14:17, las = 2)
-lines(cc$year, cc$min_mean, lwd = 1.2, col = dat_col)
-points(pt_yrs, cc$temp_mean[cc$year %in% pt_yrs], pch = 19, col = dat_col, cex = 1)
-mm <- lm(min_mean~year, data = cc)
-conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
-lines(1968:2019, conf_interval$fit, col = dat_col)
-polygon(c(1968:2019, 2019:1968), c(conf_interval$lwr, rev(conf_interval$upr)),
-        col = alpha(dat_col, .3), border = NA)
+# lines(cc$year, cc$min_mean, lwd = 1.2, col = dat_col)
+points(pt_yrs, cc$temp_mean[cc$year %in% pt_yrs], pch = 19, col = dat_col, cex = 1, xpd = NA)
+# mm <- lm(min_mean~year, data = cc)
+# conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
+# lines(1968:2019, conf_interval$fit, col = dat_col)
+# polygon(c(1968:2019, 2019:1968), c(conf_interval$lwr, rev(conf_interval$upr)),
+#         col = alpha(dat_col, .3), border = NA)
 mtext('Air Temp C', 2, 2.7, cex = .8)
 text(1982, 14.2, 'Daily mean, slope = 0.41 ± 0.06°C/decade', col = dat_col, cex = 1)
 
 #precip
 plot(cc$year, cc$cumulative_precip, type = 'l', lwd = 1.2, col = precip_col,
      axes = F, ylim = c(0.9, 1.7), xpd = NA, ylab = '', xlab = '')
-points(pt_yrs, cc$cumulative_precip[cc$year %in% pt_yrs], pch = 19, col = precip_col, cex = 1)
+points(pt_yrs, cc$cumulative_precip[cc$year %in% pt_yrs], pch = 19, col = precip_col, cex = 1, xpd = NA)
 axis(2, at = c(0.9, 1.3, 1.7), las = 2)
 mtext('Annual Precip (m)', 2, 2.7, cex = .8)
 
@@ -369,7 +379,7 @@ zz <- d %>%
   mutate(pdsi = pdsi * 0.01) %>%
   filter(
     month(date) %in% 9:11,
-    year(date) %in% 1968:2019
+    year(date) %in% 1967:2021
   ) %>%
   group_by(year = year(date)) %>%
   summarize(pdsi = mean(pdsi))
