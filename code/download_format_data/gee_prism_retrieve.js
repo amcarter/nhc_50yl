@@ -6,6 +6,7 @@ var startDate = '1960-01-01';
 var endDate = ee.Date(Date.now()).format('YYYY-MM-dd');
 
 // Load PRISM monthly data
+// var prism = ee.ImageCollection('OREGONSTATE/PRISM/AN81d') (for daily)
 var prism = ee.ImageCollection('OREGONSTATE/PRISM/AN81m')
               .filterDate(startDate, endDate)
               .filterBounds(watershed)

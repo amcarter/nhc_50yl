@@ -308,7 +308,9 @@ png("figures/Climate_Watershed_Multipanel_figure3.png", width = 4, height = 4.2,
 precip_col ='steelblue'
 dat_col = 'grey25'
 prod_col = 'forestgreen'
-pt_yrs <- c(1968, 1969, 2019)
+pt_yrs <- c(1968, 1969, 1970, 2019, 2020)
+pt_yrs_nhc <- c(2017, 2018, 2019)
+
 
 m <- cbind(c(1, 1, 2, 2, 3, 3, 4, 4, 5, 5))
 layout(m)
@@ -321,25 +323,31 @@ plot(cc$year, cc$temp_mean, type = 'l', lwd = 1.2, xaxt = 'n', yaxt = 'n',
      col = dat_col, ylim = c(13.5, 17), bty = 'n')
 mm <- lm(temp_mean~year, data = cc)
 m_ar1 <- forecast::Arima(cc$temp_mean, order = c(1, 0, 0), xreg = matrix(cc$year, ncol = 1))
-conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
-# conf_interval <- predict(m_ar1, newxreg = cc$year)
-lines(1967:2021, conf_interval$fit, col = dat_col)
-polygon(c(1967:2021, 2021:1967), c(conf_interval$lwr, rev(conf_interval$upr)),
+# conf_interval <- data.frame(predict(m_ar1, interval="confidence", level = 0.95))
+conf_interval <- forecast(m_ar1, xreg = cc$year)
+lines(1967:2021, conf_interval$mean, col = dat_col)
+polygon(c(1967:2021, 2021:1967), c(conf_interval$lower[,1], rev(conf_interval$upper[,1])),
         col = alpha(dat_col, .3), border = NA)
 axis(2, at = 14:17, labels = 14:17, las = 2)
 # lines(cc$year, cc$min_mean, lwd = 1.2, col = dat_col)
+points(pt_yrs_nhc, cc$temp_mean[cc$year %in% pt_yrs_nhc], pch = 3, col = dat_col, cex = 1.5, xpd = NA)
 points(pt_yrs, cc$temp_mean[cc$year %in% pt_yrs], pch = 19, col = dat_col, cex = 1, xpd = NA)
+legend(x = 1967, y = 17.5, legend = c("CB", "NHC"), pch = c(19, 3), col = "gray45", bty = 'n', xpd=NA)
 # mm <- lm(min_mean~year, data = cc)
 # conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
 # lines(1968:2019, conf_interval$fit, col = dat_col)
 # polygon(c(1968:2019, 2019:1968), c(conf_interval$lwr, rev(conf_interval$upr)),
 #         col = alpha(dat_col, .3), border = NA)
 mtext('Air Temp C', 2, 2.7, cex = .8)
-text(1982, 14.2, 'Daily mean, slope = 0.41 ± 0.06°C/decade', col = dat_col, cex = 1)
+text(1982, 13.7, 'Daily mean, slope = 0.28 ± 0.06°C/decade', col = dat_col, cex = 1, xpd=NA)
 
 #precip
 plot(cc$year, cc$cumulative_precip, type = 'l', lwd = 1.2, col = precip_col,
      axes = F, ylim = c(0.9, 1.7), xpd = NA, ylab = '', xlab = '')
+# mm <- lm(cumulative_precip~year, data = cc)
+# m_ar1 <- forecast::Arima(cc$cumulative_precip, order = c(1, 0, 0), xreg = matrix(cc$year, ncol = 1))
+# conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
+points(pt_yrs_nhc, cc$cumulative_precip[cc$year %in% pt_yrs_nhc], pch = 3, col = precip_col, cex = 1.5, xpd = NA)
 points(pt_yrs, cc$cumulative_precip[cc$year %in% pt_yrs], pch = 19, col = precip_col, cex = 1, xpd = NA)
 axis(2, at = c(0.9, 1.3, 1.7), las = 2)
 mtext('Annual Precip (m)', 2, 2.7, cex = .8)
@@ -350,12 +358,20 @@ plot(cc$year, cc$percent_extreme, type = 'l', lwd = 1.2, col = precip_col, axes 
 axis(2, at = c(60, 70, 80), labels = c('60%', '70%', '80%'), las = 2)
 mtext('% Extreme', 2, 2.7, cex = .8)
 mm <- lm(percent_extreme~year, data = cc)
-conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
-lines(1979:2019, conf_interval$fit, col = precip_col)
+ccc <- filter(cc, ! is.na(percent_extreme))
+m_ar1 <- forecast::Arima(ccc$percent_extreme, order = c(1, 0, 0), xreg = matrix(ccc$year, ncol = 1))
+# conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
+conf_interval <- forecast(m_ar1, xreg = ccc$year)
+lines(1979:2019, conf_interval$mean, col = dat_col)
+polygon(c(1979:2019, 2019:1979), c(conf_interval$lower[,1], rev(conf_interval$upper[,1])),
+        col = alpha(dat_col, .3), border = NA)
+
+# lines(1979:2019, conf_interval$fit, col = precip_col)
+points(pt_yrs_nhc, cc$percent_extreme[cc$year %in% pt_yrs_nhc], pch = 3, col = precip_col, cex = 1.5, xpd = NA)
 points(pt_yrs, cc$percent_extreme[cc$year %in% pt_yrs], pch = 19, col = precip_col, cex = 1)
-polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
-        col = alpha(precip_col, .3), border = NA)
-text(1970, 75, 'slope = 2.97 ± 0.06%/decade', col = precip_col, cex = 1)
+# polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
+#         col = alpha(precip_col, .3), border = NA)
+text(1970, 75.5, 'slope = 2.95 ± 0.68%/decade', col = precip_col, cex = 1)
 
 #no precip days
 m_ar1 <- forecast::Arima(cc$zero_days, order = c(1, 0, 0), xreg = matrix(cc$year, ncol = 1))
@@ -364,13 +380,23 @@ plot(cc$year, cc$zero_days, type = 'l', lwd = 1.2, col = precip_col, axes = F)
 axis(2, las = 2)#, at = c(60, 70, 80), labels = c('60%', '70%', '80%'))
 mtext('No Precip Days', 2, 2.7, cex = .8)
 mm <- lm(zero_days~year, data = cc)
-conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
-lines(1979:2019, conf_interval$fit, col = precip_col)
+ccc <- filter(cc, ! is.na(zero_days))
+m_ar1 <- forecast::Arima(ccc$zero_days, order = c(1, 0, 0), xreg = matrix(ccc$year, ncol = 1))
+# conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
+conf_interval <- forecast(m_ar1, xreg = ccc$year)
+lines(1979:2019, conf_interval$mean, col = dat_col)
+polygon(c(1979:2019, 2019:1979), c(conf_interval$lower[,1], rev(conf_interval$upper[,1])),
+        col = alpha(dat_col, .3), border = NA)
+
+# m_ar1 <- forecast::Arima(cc$zero_days, order = c(1, 0, 0), xreg = matrix(cc$year, ncol = 1))
+# conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
+# lines(1979:2019, conf_interval$fit, col = precip_col)
+points(pt_yrs_nhc, cc$zero_days[cc$year %in% pt_yrs_nhc], pch = 3, col = precip_col, cex = 1.5, xpd = NA)
 points(pt_yrs, cc$zero_days[cc$year %in% pt_yrs], pch = 19, col = precip_col, cex = 1)
-polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
-        col = alpha(precip_col, .3), border = NA)
-text(1970, 220, 'slope = 12.1 ± 0.2 days/decade', col = precip_col, cex = 1)
-rect(1967, 56.2, 2020, 537, xpd = NA)
+# polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
+#         col = alpha(precip_col, .3), border = NA)
+text(1970, 224, 'slope = 12.1 ± 2.4 days/decade', col = precip_col, cex = 1)
+rect(1967, 56.2, 2021, 537, xpd = NA)
 
 drought_col <- "firebrick3"
 d <- read_csv("data/other_watershed_stuff/PDSI_timeseries.csv")
@@ -386,6 +412,7 @@ zz <- d %>%
 
 pdsi <- forecast::Arima(zz$pdsi, order = c(1, 0, 0), xreg = matrix(zz$year, ncol = 1))
 plot(zz$year, zz$pdsi, type = "l", lwd = 1.2, col = drought_col, axes = F)
+points(pt_yrs_nhc, zz$pdsi[zz$year %in% pt_yrs_nhc], pch = 3, col = drought_col, cex = 1.5, xpd = NA)
 points(pt_yrs, zz$pdsi[zz$year %in% pt_yrs], pch = 19, col = drought_col, cex = 1)
 axis(1, padj = -0.5)
 axis(2, las = 2) # , at = c(60, 70, 80), labels = c('60%', '70%', '80%'))
