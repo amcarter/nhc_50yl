@@ -13,24 +13,42 @@ site_dat <- read_csv("../data/rating_curves/calculated_channel_dimensions_maroct
   right_join(site_dat, by = "distance_m")
 
 sm_met <- readRDS("data/metabolism/compiled/met_preds_stream_metabolizer_O2.rds")
+boot_met <- read_csv("data/metabolism/compiled/bootstrapped/SM_met_means_bootstrapped_seasonally_proportions.csv")
 
 # Summarize metabolism by month ####
-monthly <- sm_met$preds %>%
-  filter(year != 2020) %>%
-  mutate(year = case_when(era == "then" ~ 1969,
-                          TRUE ~ year)) %>%
-  # filter(GPP < 5)
-  select(-starts_with("K600"), -ends_with(c('lower', 'upper')),
-         -level_m, -doy, -method, -date, -era, -depth) %>%
-  group_by(site, year, month) %>%
-  summarize(across(everything(),
-                   .fns = list(mean = ~mean(.,na.rm = T),
-                               se = ~sd(.,na.rm = T)/sqrt(n())),
-                   .names = "{col}_{fn}")) %>%
+# monthly <- sm_met$preds %>%
+#   filter(year != 2020) %>%
+#   mutate(year = case_when(era == "then" ~ 1969,
+#                           TRUE ~ year)) %>%
+  # select(-starts_with("K600"), -ends_with(c('lower', 'upper')),
+  #        -level_m, -doy, -method, -date, -era, -depth) %>%
+  # group_by(site, year, month) %>%
+  # summarize(across(everything(),
+  #                  .fns = list(mean = ~mean(.,na.rm = T),
+  #                              se = ~sd(.,na.rm = T)/sqrt(n())),
+  #                  .names = "{col}_{fn}")) %>%
+  # ungroup()
+cbp_monthly <- boot_met %>%
+  filter(data %in% c("CB_68_70", "CB_2019")) %>%
+  mutate(year = case_when(data == "CB_68_70" ~ 1969,
+                          TRUE ~ 2019),
+         month = month(date)) %>%
+  group_by(data, year, month, date) %>%
+  summarize(across(starts_with(c("GPP_", "ER_")),
+                   .fns = mean)) %>%
+  ungroup() %>%
+  mutate(GPP_se = (GPP_upper - GPP_lower)/(2*1.96),
+         ER_se = (ER_upper - ER_lower)/(2*1.96)) %>%
+  group_by(data, year, month) %>%
+  summarize(GPP_mean_mean = mean(GPP_mean),
+            GPP_mean_se = sqrt(sum(GPP_se^2)/n()),
+            GPP_se = sd(GPP_mean),
+            ER_mean_mean = mean(ER_mean),
+            ER_mean_se = sqrt(sum(ER_se^2)/n()),
+            ER_se = sd(ER_mean)) %>%
   ungroup()
 
-cbp_monthly <- monthly %>%
-  filter(site == "CBP")
+cbp_monthly
 
 # plot metabolism by month ####
 png("figures/2019monthly_avg_met_all_years_directcalc.png",
@@ -52,15 +70,14 @@ ggplot(aes(x = month, y = GPP_mean)) +
        x = "month", y = "gC/m2/d")
 dev.off()
 
-now_19 <- monthly %>%
+now <- cbp_monthly %>%
   filter(year == 2019)
-now_y <- monthly %>%
-  filter(site %in% c("NHC", "UNHC"))
-then <- monthly %>%
-  filter(year == 1969,
-         site == "CBP")
-now <- monthly %>%
-  filter(year == 2019, site == "CBP")
+# now_y <- monthly %>%
+#   filter(site %in% c("NHC", "UNHC"))
+then <- cbp_monthly %>%
+  filter(year == 1969)
+# now <- monthly %>%
+#   filter(year == 2019, site == "CBP")
 
 png("figures/ER_inexcess_GPP_2019cbp.png",
     width = 4.77, height = 4.9, res = 300, units = "in")
@@ -68,24 +85,24 @@ png("figures/ER_inexcess_GPP_2019cbp.png",
   plot(1, type = 'n', xlim = c(1,12), ylim = c(0,4), ylab = "g O2/m2/d",
        xlab = "month", xaxt = "n",
        main = "Respiration in excess of GPP")
-  polygon(c(1:12,12:1),  c(-now$ER_mean, rev(now$GPP_mean)),
+  polygon(c(1:12,12:1),  c(-now$ER_mean_mean, rev(now$GPP_mean_mean)),
           col = alpha("black", .3), border = NA, lwd = 2)
   polygon(c(2.27,3.75,3.75,2.27), c(0,0,3,3), col = 'white', border = NA)
-  lines(1:12, -now$ER_mean, lty = 2, lwd = 2)
-  points(1:12, -now$ER_mean, pch = 19)
-  lines(1:12, now$GPP_mean, lwd = 2)
-  points(1:12, now$GPP_mean, pch = 19)
-  arrows(x0 = 1:12, y0 = -now$ER_mean,
-         x1 = 1:12, y1 = -now$ER_mean - now$ER_se,
+  lines(1:12, -now$ER_mean_mean, lty = 2, lwd = 2)
+  points(1:12, -now$ER_mean_mean, pch = 19)
+  lines(1:12, now$GPP_mean_mean, lwd = 2)
+  points(1:12, now$GPP_mean_mean, pch = 19)
+  arrows(x0 = 1:12, y0 = -now$ER_mean_mean,
+         x1 = 1:12, y1 = -now$ER_mean_mean - now$ER_mean_se,
          length = 0.05, lwd = 2, angle = 90)
-  arrows(x0 = 1:12, y0 = -now$ER_mean,
-         x1 = 1:12, y1 = -now$ER_mean + now$ER_se,
+  arrows(x0 = 1:12, y0 = -now$ER_mean_mean,
+         x1 = 1:12, y1 = -now$ER_mean_mean + now$ER_mean_se,
          length = 0.05, lwd = 2, angle = 90)
-  arrows(x0 = 1:12, y0 = now$GPP_mean,
-         x1 = 1:12, y1 = now$GPP_mean + now$GPP_se,
+  arrows(x0 = 1:12, y0 = now$GPP_mean_mean,
+         x1 = 1:12, y1 = now$GPP_mean_mean + now$GPP_mean_se,
          length = 0.05, lwd = 2, angle = 90)
-  arrows(x0 = 1:12, y0 = now$GPP_mean,
-         x1 = 1:12, y1 = now$GPP_mean - now$GPP_se,
+  arrows(x0 = 1:12, y0 = now$GPP_mean_mean,
+         x1 = 1:12, y1 = now$GPP_mean_mean - now$GPP_mean_se,
          length = 0.05, lwd = 2, angle = 90)
 
   axis(1, at = seq(1, 12, by = 1), labels =
@@ -98,107 +115,107 @@ png("figures/ER_inexcess_GPP_comparison_cbp2.png",
   plot(1, type = 'n', xlim = c(1,12), ylim = c(0,4), ylab = "g O2/m2/d",
        xlab = "month", xaxt = "n",
        main = "Respiration in excess of GPP")
-  polygon(c(1:12,12:1),  c(-now$ER_mean, rev(now$GPP_mean)),
+  polygon(c(1:12,12:1),  c(-now$ER_mean_mean, rev(now$GPP_mean_mean)),
           col = alpha("black", .3), border = NA, lwd = 2)
   polygon(c(2.27,3.75,3.75,2.27), c(0,0,3,3), col = 'white', border = NA)
-  polygon(c(1:8, 10:12, 12:10, 8:1), c(-then$ER_mean, rev(then$GPP_mean)),
+  polygon(c(1:8, 10:12, 12:10, 8:1), c(-then$ER_mean_mean, rev(then$GPP_mean_mean)),
           col = alpha("brown3", .4), border = NA)
-  lines(1:12, -now$ER_mean, lty = 2, lwd = 2)
-  points(1:12, -now$ER_mean, pch = 19)
-  lines(1:12, now$GPP_mean, lwd = 2)
-  points(1:12, now$GPP_mean, pch = 19)
-  arrows(x0 = 1:12, y0 = -now$ER_mean,
-         x1 = 1:12, y1 = -now$ER_mean - now$ER_se,
+  lines(1:12, -now$ER_mean_mean, lty = 2, lwd = 2)
+  points(1:12, -now$ER_mean_mean, pch = 19)
+  lines(1:12, now$GPP_mean_mean, lwd = 2)
+  points(1:12, now$GPP_mean_mean, pch = 19)
+  arrows(x0 = 1:12, y0 = -now$ER_mean_mean,
+         x1 = 1:12, y1 = -now$ER_mean_mean - now$ER_mean_se,
          length = 0.05, lwd = 2, angle = 90)
-  arrows(x0 = 1:12, y0 = -now$ER_mean,
-         x1 = 1:12, y1 = -now$ER_mean + now$ER_se,
+  arrows(x0 = 1:12, y0 = -now$ER_mean_mean,
+         x1 = 1:12, y1 = -now$ER_mean_mean + now$ER_mean_se,
          length = 0.05, lwd = 2, angle = 90)
-  arrows(x0 = 1:12, y0 = now$GPP_mean,
-         x1 = 1:12, y1 = now$GPP_mean + now$GPP_se,
+  arrows(x0 = 1:12, y0 = now$GPP_mean_mean,
+         x1 = 1:12, y1 = now$GPP_mean_mean + now$GPP_mean_se,
          length = 0.05, lwd = 2, angle = 90)
-  arrows(x0 = 1:12, y0 = now$GPP_mean,
-         x1 = 1:12, y1 = now$GPP_mean - now$GPP_se,
+  arrows(x0 = 1:12, y0 = now$GPP_mean_mean,
+         x1 = 1:12, y1 = now$GPP_mean_mean - now$GPP_mean_se,
          length = 0.05, lwd = 2, angle = 90)
 
   axis(1, at = seq(1, 12, by = 1), labels =
          substr(month.abb[seq(1,12, by = 1)], 1,1))
 
-  lines(then$month, -then$ER_mean, lwd = 2, lty = 2, col = 'brown4')
-  lines(then$month, then$GPP_mean, lwd = 2, col = 'brown4')
-  points(then$month, -then$ER_mean, pch = 19, col = 'brown4')
-  points(then$month, then$GPP_mean, pch = 19, col = 'brown4')
-  arrows(x0 = then$month, y0 = -then$ER_mean,
-         x1 = then$month, y1 = -then$ER_mean + then$ER_se,
+  lines(then$month, -then$ER_mean_mean, lwd = 2, lty = 2, col = 'brown4')
+  lines(then$month, then$GPP_mean_mean, lwd = 2, col = 'brown4')
+  points(then$month, -then$ER_mean_mean, pch = 19, col = 'brown4')
+  points(then$month, then$GPP_mean_mean, pch = 19, col = 'brown4')
+  arrows(x0 = then$month, y0 = -then$ER_mean_mean,
+         x1 = then$month, y1 = -then$ER_mean_mean + then$ER_mean_se,
          length = 0.05, lwd = 2, angle = 90, col = 'brown4')
-  arrows(x0 = then$month, y0 = -then$ER_mean,
-         x1 = then$month, y1 = -then$ER_mean - then$ER_se,
+  arrows(x0 = then$month, y0 = -then$ER_mean_mean,
+         x1 = then$month, y1 = -then$ER_mean_mean - then$ER_mean_se,
          length = 0.05, lwd = 2, angle = 90, col = 'brown4')
-  arrows(x0 = then$month, y0 = then$GPP_mean,
-         x1 = then$month, y1 = then$GPP_mean - then$GPP_se,
+  arrows(x0 = then$month, y0 = then$GPP_mean_mean,
+         x1 = then$month, y1 = then$GPP_mean_mean - then$GPP_mean_se,
          length = 0.05, lwd = 2, angle = 90, col = 'brown4')
-  arrows(x0 = then$month, y0 = then$GPP_mean,
-         x1 = then$month, y1 = then$GPP_mean + then$GPP_se,
+  arrows(x0 = then$month, y0 = then$GPP_mean_mean,
+         x1 = then$month, y1 = then$GPP_mean_mean + then$GPP_mean_se,
          length = 0.05, lwd = 2, angle = 90, col = 'brown4')
 dev.off()
 
 
 colors = MetBrewer::met.brewer(name="Kandinsky", n=4)
 
-png("figures/ER_inexcess_GPP_comparison_cbp.png",
+png("figures/ER_inexcess_GPP_comparison_cbp_boot.png",
     width = 4.5, height = 4.5, res = 300, units = "in")
 
   par(mar = c(0,4,0,1), oma = c(4,0,1,1), mfrow = c(2,1))
-  plot(1, type = 'n', xlim = c(1,12), ylim = c(0,3.5), ylab = "",
+  plot(1, type = 'n', xlim = c(1,12), ylim = c(0,3.6), ylab = "",
        xlab = "month", xaxt = "n", yaxt = 'n', yaxs = 'i')
   axis(2, las = 2, at = 0:4, labels = 0:4)
   mtext('1969', line = -1.5, adj = .05)
-  polygon(c(1:8, 10:12, 12:10, 8:1), c(-then$ER_mean, rev(then$GPP_mean)),
+  polygon(c(1:12, 12:1), c(-then$ER_mean_mean, rev(then$GPP_mean_mean)),
           col = alpha("black", .2), border = NA)
-  polygon(c(2.7,3.25,3.25,2.7), c(0,0,3,3), col = 'white', border = NA)
-  lines(then$month, -then$ER_mean, lwd = 2, col = colors[2])
-  lines(then$month, then$GPP_mean, lwd = 2, col = colors[1])
-  points(then$month, -then$ER_mean, pch = 19, col =  colors[2])
-  points(then$month, then$GPP_mean, pch = 19, col = colors[1])
-  arrows(x0 = then$month, y0 = -then$ER_mean,
-         x1 = then$month, y1 = -then$ER_mean + then$ER_se,
+  polygon(c(2.6,3.35,3.35,2.6), c(0.2,0.2,3,3), col = 'white', border = NA)
+  lines(then$month, -then$ER_mean_mean, lwd = 2, col = colors[2])
+  lines(then$month, then$GPP_mean_mean, lwd = 2, col = colors[1])
+  arrows(x0 = seq(0.975, 11.975, by = 1), y0 = -then$ER_mean_mean,
+         x1 = seq(0.975, 11.975, by = 1), y1 = -then$ER_mean_mean + then$ER_mean_se,
          length = 0.05, lwd = 2, angle = 90,  col = colors[2])
-  arrows(x0 = then$month, y0 = -then$ER_mean,
-         x1 = then$month, y1 = -then$ER_mean - then$ER_se,
+  arrows(x0 = seq(0.975, 11.975, by = 1), y0 = -then$ER_mean_mean,
+         x1 = seq(0.975, 11.975, by = 1), y1 = -then$ER_mean_mean - then$ER_mean_se,
          length = 0.05, lwd = 2, angle = 90, col = colors[2])
-  arrows(x0 = then$month, y0 = then$GPP_mean,
-         x1 = then$month, y1 = then$GPP_mean - then$GPP_se,
+  arrows(x0 = seq(1.025, 12.025, by = 1), y0 = then$GPP_mean_mean,
+         x1 = seq(1.025, 12.025, by = 1), y1 = then$GPP_mean_mean - then$GPP_mean_se,
          length = 0.05, lwd = 2, angle = 90, col = colors[1])
-  arrows(x0 = then$month, y0 = then$GPP_mean,
-         x1 = then$month, y1 = then$GPP_mean + then$GPP_se,
+  arrows(x0 = seq(1.025, 12.025, by = 1), y0 = then$GPP_mean_mean,
+         x1 = seq(1.025, 12.025, by = 1), y1 = then$GPP_mean_mean + then$GPP_mean_se,
          length = 0.05, lwd = 2, angle = 90, col = colors[1])
+  points(then$month, -then$ER_mean_mean, pch = 19, col =  colors[2])
+  points(then$month, then$GPP_mean_mean, pch = 19, col = colors[1])
   legend('topright', c('ER', 'GPP'), col = c(colors[2], colors[1]),
          bty = 'n', lty = c(1,1), lwd = 2, cex = 0.7)
 
-  plot(1, type = 'n', xlim = c(1,12), ylim = c(0,3.5), ylab = "",
+  plot(1, type = 'n', xlim = c(1,12), ylim = c(0,3.6), ylab = "",
        xlab = "month", xaxt = "n", yaxt = 'n', yaxs = 'i')
   axis(1, at = seq(1, 12, by = 1),
        labels = substr(month.abb[seq(1,12, by = 1)], 1,1))
   axis(2, las = 2, at = 0:4, labels = 0:4)
 
-  polygon(c(1:12,12:1),  c(-now$ER_mean, rev(now$GPP_mean)),
+  polygon(c(1:12,12:1),  c(-now$ER_mean_mean, rev(now$GPP_mean_mean)),
           col = alpha("black", .2), border = NA, lwd = 2)
-  polygon(c(2.27,3.75,3.75,2.27), c(0.1,0.1,3,3), col = 'white', border = NA)
-  points(1:12, -now$ER_mean, col = colors[2], pch = 19)
-  lines(1:12, -now$ER_mean, col = colors[2], lwd = 2)
-  lines(1:12, now$GPP_mean,  col = colors[1],lwd = 2)
-  points(1:12, now$GPP_mean, col = colors[1], pch = 19)
-  arrows(x0 = 1:12, y0 = -now$ER_mean,
-         x1 = 1:12, y1 = -now$ER_mean - now$ER_se,
+  polygon(c(2.33,3.9,3.9,2.33), c(0.1,0.1,3,3), col = 'white', border = NA)
+  lines(1:12, -now$ER_mean_mean, col = colors[2], lwd = 2)
+  lines(1:12, now$GPP_mean_mean,  col = colors[1],lwd = 2)
+  arrows(x0 = seq(0.975, 11.975, by = 1), y0 = -now$ER_mean_mean,
+         x1 = seq(0.975, 11.975, by = 1), y1 = -now$ER_mean_mean - now$ER_mean_se,
          length = 0.05, col = colors[2], lwd = 2, angle = 90)
-  arrows(x0 = 1:12, y0 = -now$ER_mean,
-         x1 = 1:12, y1 = -now$ER_mean + now$ER_se,
+  arrows(x0 = seq(0.975, 11.975, by = 1), y0 = -now$ER_mean_mean,
+         x1 = seq(0.975, 11.975, by = 1), y1 = -now$ER_mean_mean + now$ER_mean_se,
          length = 0.05, col = colors[2], lwd = 2, angle = 90)
-  arrows(x0 = 1:12, y0 = now$GPP_mean,
-         x1 = 1:12, y1 = now$GPP_mean + now$GPP_se,
+  arrows(x0 = seq(1.025, 12.025, by = 1), y0 = now$GPP_mean_mean,
+         x1 = seq(1.025, 12.025, by = 1), y1 = now$GPP_mean_mean + now$GPP_mean_se,
          length = 0.05, col = colors[1], lwd = 2, angle = 90)
-  arrows(x0 = 1:12, y0 = now$GPP_mean,
-         x1 = 1:12, y1 = now$GPP_mean - now$GPP_se,
+  arrows(x0 = seq(1.025, 12.025, by = 1), y0 = now$GPP_mean_mean,
+         x1 = seq(1.025, 12.025, by = 1), y1 = now$GPP_mean_mean - now$GPP_mean_se,
          length = 0.05, col = colors[1], lwd = 2, angle = 90)
+  points(1:12, -now$ER_mean_mean, col = colors[2], pch = 19)
+  points(1:12, now$GPP_mean_mean, col = colors[1], pch = 19)
   mtext('2019', line = -1.5, adj = .05)
   par(mfrow = c(1,1), new = T)
   mtext('Month', side = 1, line = 2.2)
@@ -215,8 +232,8 @@ plot(1, type = 'n', xlim = c(1,12), ylim = c(-5,4),
      ylab = "Metabolism g O2/m2/d",
      xlab = "month", xaxt = "n")
 abline(h = 0)
-lines(then$month, then$ER_mean, lwd = 2, col = 'sienna')
-lines(then$month, then$GPP_mean, lwd = 2, col = 'forestgreen')
+lines(then$month, then$ER_mean_mean, lwd = 2, col = 'sienna')
+lines(then$month, then$GPP_mean_mean, lwd = 2, col = 'forestgreen')
 polygon(c(then$month, rev(then$month)), c(then$ER_mean + then$ER_se,
                                           rev(then$ER_mean - then$ER_se)),
         col = alpha('sienna', .5), border = NA)

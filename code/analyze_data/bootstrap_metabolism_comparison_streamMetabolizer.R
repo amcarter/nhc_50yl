@@ -37,6 +37,10 @@ nhc_new <- dat$preds %>%
     filter(era == "now",
            site == "CBP")
 
+nhc_site <- dat$preds %>%
+    filter(era == "now",
+           site == "NHC")
+
 gpp_new = nhc_new$GPP
 er_new = nhc_new$ER
 nep_new = gpp_new + er_new
@@ -187,7 +191,7 @@ dev.off()
 n_68 = length(gpp_68_70[!is.na(gpp_68_70)])
 n_new = length(er_new[!is.na(er_new)])
 month_props <- c(31, 28, 31, 30, 31, 30, 31, 31, 0, 31, 30, 31)
-names(month_props) <- c('01', '03', '02', '04', '05', '06',
+names(month_props) <- c('01', '02', '03', '04', '05', '06',
                         '07', '08', '09', '10', '11', '12')
 gpp_68_70_bymo = split(gpp_68_70[!is.na(gpp_68_70)],
                        factor(substr(nhc_68_70$date, 6, 7)))
@@ -198,12 +202,161 @@ gpp_new_bymo = split(gpp_new[!is.na(gpp_new)],
 er_new_bymo = split(er_new[!is.na(er_new)],
                     factor(substr(dates_new[!is.na(er_new)], 6, 7)))
 
-nsamp = 20000
+nhc_68_70$doy = as.numeric(format(nhc_68_70$date, "%j"))
+nhc_new$doy = as.numeric(format(nhc_new$date, "%j"))
+
+nsamp = 10000
+
+
+summarize_bootstrap_met <- function(met_dat){
+    # make an empty matrix for samples
+    samps_mat <- matrix(NA_real_, ncol = nsamp, nrow = 365)
+    row.names(samps_mat) <- as.character(1:365)
+    samp_mat_GPP = samp_mat_ER = samps_mat
+
+    # iterate taking samples for each day
+    for(d in 1:365){
+        dat_tmp <- met_dat %>%
+            select(date, doy, GPP, ER) %>%
+            mutate(day_diff = case_when(doy - d < 183 & doy - d >= 0 ~ doy - d,
+                                        d - doy < 183 & d - doy > 0 ~ d - doy,
+                                        365 - doy + d < 183 ~ 365 - doy + d,
+                                        365 - d + doy < 183 ~ 365 - d + doy,
+                                        TRUE ~ NA_real_),
+                   prob = 1/(day_diff + 1)^2,
+                   prob_norm = prob/sum(prob)) %>% arrange(doy) #%>% print(n = 100)
+        samp_mat_GPP[d,] <- sample(x = dat_tmp$GPP, size = nsamp,
+                                    replace = TRUE, prob = dat_tmp$prob_norm)
+        samp_mat_ER[d,] <- sample(x = dat_tmp$ER, size = nsamp,
+                                   replace = TRUE, prob = dat_tmp$prob_norm)
+    }
+    # summarize data for each day
+    sum_dat <- data.frame(date = seq(as.Date("2019-01-01"), as.Date("2019-12-31"), by = "day"),
+               doy = as.numeric(row.names(samp_mat_GPP)),
+               GPP_med = apply(samp_mat_GPP, 1, median),
+               GPP_mean = apply(samp_mat_GPP, 1, mean),
+               GPP_upper = apply(samp_mat_GPP, 1, function(x) quantile(x, probs = 0.975)),
+               GPP_lower = apply(samp_mat_GPP, 1, function(x) quantile(x, probs = 0.025)),
+               ER_med = apply(samp_mat_ER, 1, median),
+               ER_mean = apply(samp_mat_ER, 1, mean),
+               ER_upper = apply(samp_mat_ER, 1, function(x) quantile(x, probs = 0.975)),
+               ER_lower = apply(samp_mat_ER, 1, function(x) quantile(x, probs = 0.025)))
+
+    return(sum_dat)
+}
+
+historic_sum_dat <- summarize_bootstrap_met(nhc_68_70) %>%
+    mutate(data = "CB_68_70")
+new_sum_dat <- summarize_bootstrap_met(filter(nhc_new, !is.na(GPP) & !is.na(ER))) %>%
+    mutate(data = "CB_2019")
+nhc_17 <- summarize_bootstrap_met(filter(nhc_site, year == 2017 & !is.na(GPP) & !is.na(ER))) %>%
+    left_join(select(filter(nhc_site, year == 2017), doy, GPP, ER)) %>% mutate(data = "NHC_2017")
+nhc_18 <- summarize_bootstrap_met(filter(nhc_site, year == 2018 & !is.na(GPP) & !is.na(ER))) %>%
+    left_join(select(filter(nhc_site, year == 2018), doy, GPP, ER)) %>% mutate(data = "NHC_2018")
+nhc_19 <- summarize_bootstrap_met(filter(nhc_site, year == 2019 & !is.na(GPP) & !is.na(ER))) %>%
+    left_join(select(filter(nhc_site, year == 2019), doy, GPP, ER)) %>% mutate(data = "NHC_2019")
+
+bootstrapped_dat <- bind_rows(full_join(historic_sum_dat, select(nhc_68_70, doy, GPP, ER)),
+          full_join(new_sum_dat, select(nhc_new, doy, GPP, ER)),
+          nhc_17, nhc_18, nhc_19)
+
+write_csv(bootstrapped_dat,
+          "data/metabolism/compiled/bootstrapped/SM_met_means_bootstrapped_seasonally_proportions.csv")
+
+bootstrapped_dat %>%
+    mutate(month = month(date)) %>%
+    group_by(data, month) %>%
+    summarize(
+        GPP_sd = sd(GPP_mean),
+        GPP_mean = mean(GPP_mean),
+        ER_sd = sd(ER_mean),
+        ER_mean = mean(ER_mean)) %>%
+    ggplot(aes(month, GPP_mean))+
+    geom_line() +
+    geom_line(aes(y = ER_mean)) +
+    geom_ribbon(aes(ymin = GPP_mean - GPP_sd*1.96,
+                    ymax = GPP_mean + GPP_sd*1.96), fill = "forestgreen", alpha = 0.3)+
+    geom_ribbon(aes(ymin = ER_mean - ER_sd*1.96,
+                    ymax = ER_mean + ER_sd*1.96), fill = "sienna1", alpha = 0.3) +
+    facet_wrap(.~data)
+
+bootstrapped_dat %>%
+    group_by(data) %>% summarize(GPP_max = max(GPP, na.rm = T),
+                                 GPP_min = min(GPP, na.rm = T),
+                                 GPP_mean = mean(GPP, na.rm = T),
+                                 ER_max = min(ER, na.rm = T),
+                                 ER_min = max(ER, na.rm = T),
+                                 ER_mean = mean(ER, na.rm = T))
+
+bootstrapped_dat %>%
+    ggplot(aes(doy, GPP_mean)) +
+        geom_point(pch = 20) +
+        geom_ribbon(aes(ymin = GPP_lower, ymax = GPP_upper), fill = "lightgreen", alpha = 0.5) +
+        geom_point(aes(y = ER_med), pch = 20) +
+        geom_ribbon(aes(ymin = ER_lower, ymax = ER_upper), fill = "sienna1", alpha = 0.5) +
+        geom_point(aes(y = GPP), pch = 1) +
+        geom_point(aes(y = ER), pch = 1) +
+        facet_wrap(.~data) +
+    theme_bw()
+
+
+ggplot(historic_sum_dat, aes(doy, GPP_med)) +
+    geom_point() +
+    geom_ribbon(aes(ymin = GPP_lower, ymax = GPP_upper), fill = "lightgreen", alpha = 0.5) +
+    geom_point(aes(y = ER_med)) +
+    geom_ribbon(aes(ymin = ER_lower, ymax = ER_upper), fill = "sienna1", alpha = 0.5) +
+    geom_point(data = nhc_68_70, aes(doy, GPP), pch = 1)+
+    geom_point(data = nhc_68_70, aes(doy, ER), pch = 1)
+ggplot(new_sum_dat, aes(doy, GPP_med)) +
+    geom_point() +
+    geom_ribbon(aes(ymin = GPP_lower, ymax = GPP_upper), fill = "lightgreen", alpha = 0.5) +
+    geom_point(aes(y = ER_med)) +
+    geom_ribbon(aes(ymin = ER_lower, ymax = ER_upper), fill = "sienna1", alpha = 0.5) +
+    geom_point(data = nhc_new, aes(doy, GPP), pch = 1)+
+    geom_point(data = nhc_new, aes(doy, ER), pch = 1)
+
+# calculate cumulative metabolism:
+bind_rows(historic_sum_dat, new_sum_dat, nhc_17, nhc_18, nhc_19) %>%
+    group_by(data) %>%
+    summarize(GPP_cum = sum(GPP_med),
+              ER_cum = sum(ER_med))
+
+bind_rows(historic_sum_dat, new_sum_dat, nhc_17, nhc_18, nhc_19) %>%
+    group_by(data)
+
+dd <- historic_sum_dat
+get_max_windows <- function(dd){
+    dd$rollER = dd$rollGPP = NA_real_
+
+    for(i in 1:(nrow(dd)-9)){
+        dd$rollER[i] <- sum(dd$ER_med[i:(i + 9)])
+        dd$rollGPP[i] <- sum(dd$GPP_med[i:(i + 9)])
+    }
+
+    roll_dates <- data.frame(GPP = dd$date[which.max(dd$rollGPP)],
+               ER = dd$date[which.min(dd$rollER)])
+
+    return(roll_dates)
+}
+# make rolling 10 day window calcs.
+
+get_max_windows(historic_sum_dat)
+get_max_windows(new_sum_dat)
+get_max_windows(nhc_17)
+get_max_windows(nhc_18)
+get_max_windows(nhc_19)
+
+
+# bootstrapped method by year:
+
 mean_vect_er_68_70 = mean_vect_er_new = mean_vect_gpp_68_70 =
     mean_vect_gpp_new = c()
 turboset <- list(c(1:12), c(10,11), c(3,4), c(7,8), c(1,2))
 names <- c("year", "oct_nov", "mar_apr", "jul_aug", "jan_feb")
 CI_prop <- data.frame()
+
+
+
 for(ss in 1:5){
     set <- turboset[[ss]]
     for(i in 1:nsamp){

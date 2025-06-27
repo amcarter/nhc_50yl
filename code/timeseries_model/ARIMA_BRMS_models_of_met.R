@@ -44,6 +44,30 @@ P <- dat %>%
                             year == 2016 ~ 2017,
                             TRUE ~ year))
 
+LAI <- read_csv('data/daily_modeled_light_all_sites.csv') %>%
+    mutate(year = year(date)) %>%
+    filter(site %in% c('CBP', "NHC"))
+lf <- c(NA_real_,
+        stats::filter(x = diff(LAI$LAI[LAI$site == "NHC"]),
+                    filter = rep(1,3)),
+        NA_real_,
+        stats::filter(x = diff(LAI$LAI[LAI$site == "CBP"]),
+                      filter = rep(1,3)))
+litter <- LAI %>%
+    mutate(lf = case_when(lf > 0 ~ 0,
+                          TRUE ~ -lf*100),
+           doy = as.numeric(format(date, "%j")),
+           Year = case_when(year == 2020 ~ 2019,
+                            TRUE ~ year),
+           Year = factor(Year)) %>%
+    group_by(site, Year)%>%
+    mutate(lf_percent = lf/max(lf, na.rm = T),
+           lf_type = case_when(lf_percent >= 0.5 ~ 'max',
+                               lf_percent >= 0.1 ~ 'med',
+                               TRUE ~ NA_character_)) %>%
+    ungroup()
+plot(litter$date, litter$lf_percent, col = factor(litter$site))
+
 for(s in c('NHC', 'CBP')){
     P1 <- P[P$site == s,] %>%
         mutate(log_Q = zoo::na.approx(log_Q, na.rm = FALSE))
@@ -52,6 +76,8 @@ for(s in c('NHC', 'CBP')){
     }
     P$RBI_7[P$site == s] <- P1$RBI_7
 }
+P <- left_join(P, select(litter, site, date, LAI, lf, lf_percent, lf_type),
+          by = c('site', 'date'))
 
 Q_sum <- P %>%
     group_by(site, year) %>%
@@ -63,7 +89,7 @@ P <- left_join(P, Q_sum, by = c('site', 'year'))
 
 scaling_pars <- P %>%
     ungroup() %>%
-    summarize(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'log_light', 'temp.water'),
+    summarize(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'log_light', 'temp.water', 'lf'),
                      .fns = c(mean = \(x) mean(x, na.rm = TRUE),
                               sd = \(x) sd(x, na.rm = TRUE))))
 
@@ -76,7 +102,7 @@ epsilon = 1e-1
 
 P_scaled <- P %>%
     ungroup() %>%
-    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'log_light', 'temp.water'),
+    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'log_light', 'temp.water', 'lf'),
                   .fns = \(x) as.vector(scale(x))),
            GPP = GPP + epsilon,
            ER = -ER + epsilon,
@@ -112,6 +138,10 @@ light <- P %>%
     summarize(light = mean(light_smooth, na.rm = T))
 plot(light)
 
+litter_hall <- filter(litter, site == "CBP") %>%
+    mutate(doy = format(date, "%j")) %>%
+    group_by(doy) %>%
+    summarize(lf = mean(lf, na.rm = T))
 # add light to Hall daatset and scale
 hall_QT <- hall_QT %>%
     mutate(doy = format(date, '%j'),
@@ -119,6 +149,7 @@ hall_QT <- hall_QT %>%
            discharge_m3s = case_when(discharge_m3s < 0.5*min_Q ~ 0.5 * min_Q,
                                      TRUE ~ discharge_m3s)) %>%
     left_join(light, by = 'doy') %>%
+    left_join(litter_hall, by = 'doy') %>%
     mutate(site = 'CBP',
            log_Q = log(discharge_m3s),
            diff_Q = c(NA, diff(log_Q)),
@@ -133,8 +164,8 @@ for(i in 8:nrow(hall_QT)){
 }
 
 hall_preds <- hall_QT %>%
-    dplyr::select(date, site,  temp.water = water_temp_C, log_Q, diff_Q, RBI_7, light) %>%
-    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water'),
+    dplyr::select(date, site,  temp.water = water_temp_C, log_Q, diff_Q, RBI_7, light, lf) %>%
+    mutate(across(c('log_Q', 'diff_Q', 'RBI_7', 'light', 'temp.water', 'lf'),
                   .fns = \(x) zoo::na.approx(x, na.rm = F)),
            site = factor(site, levels = c("CBP", "NHC"))) %>%
     slice_head(n = -4)
@@ -181,17 +212,17 @@ GPP_priors <- c(prior("normal(0,5)", class = "b"),
                 prior("normal(0,5)", class = "Intercept"),
                 prior("cauchy(0,1)", class = "sigma"))
 
-bmod_GPP <- brm(bform_GPP,
-                data = P_scaled,
-                chains = 4, cores = 4, iter = 4000,
-                prior = GPP_priors,
-                control = list(adapt_delta = 0.999,
-                               stepsize = 0.01,
-                               max_treedepth = 14) )
+# bmod_GPP <- brm(bform_GPP,
+#                 data = P_scaled,
+#                 chains = 4, cores = 4, iter = 4000,
+#                 prior = GPP_priors,
+#                 control = list(adapt_delta = 0.999,
+#                                stepsize = 0.01,
+#                                max_treedepth = 14) )
 
 # evaluate model fit:
-saveRDS(bmod_GPP, 'data/timeseries_model_fits/brms_GPP_mod.rds')
-# bmod_GPP <- readRDS('data/timeseries_model_fits/brms_GPP_mod.rds')
+# saveRDS(bmod_GPP, 'data/timeseries_model_fits/brms_GPP_mod.rds')
+bmod_GPP <- readRDS('data/timeseries_model_fits/brms_GPP_mod.rds')
 
 summary(bmod_GPP)
 
@@ -312,33 +343,34 @@ hindcast_GPP <- data.frame(
 
 
 ############## model for ER
-
-bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*mean_log_Q + light)
+# model one
+bform_ER1 <- bf(log_ER | mi() ~ ar(p = 1) + CBP + temp.water*mean_log_Q + light)
 # bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*med_log_Q + light)
-get_prior(bform_ER, data = P_scaled)
-ER_priors <- c(prior("normal(0,1)", class = "b"),
+get_prior(bform_ER1, data = P_scaled)
+ER_priors1 <- c(prior("normal(0,1)", class = "b"),
+               prior("normal(0,5)", class = "b", coef = "CBP"),
                prior("normal(0,5)", class = "b", coef = "light"),
                prior("normal(0,0.2)", class = "b", coef = "temp.water"),
                prior("normal(0,5)", class = "Intercept"),
                prior("cauchy(0,1)", class = "sigma"),
                prior("beta(1,1)", class = "ar", lb = 0, ub = 1))
-bmod_ER <- brm(bform_ER,
+bmod_ER1 <- brm(bform_ER1,
                data = P_scaled,
-               prior = ER_priors,
+               prior = ER_priors1,
                chains = 4, cores = 4, iter = 4000,
                control = list(adapt_delta = 0.999,
                               stepsize = 0.01,
                               max_treedepth = 14))
 
-saveRDS(bmod_ER, 'data/timeseries_model_fits/brms_ER_mod.rds')
-# bmod_ER <- readRDS('data/timeseries_model_fits/brms_ER_mod.rds')
+saveRDS(bmod_ER1, 'data/timeseries_model_fits/brms_ER_mod.rds')
+# bmod_ER1 <- readRDS('data/timeseries_model_fits/brms_ER_mod.rds')
 
-summary(bmod_ER)
+summary(bmod_ER1)
 
 png('figures/SI/BRMS_er_posterior_pred_check.png', width = 5, height = 4,
     units = 'in', res = 300)
 
-y_rep <- posterior_predict(bmod_ER)
+y_rep <- posterior_predict(bmod_ER1)
 n_sims <- nrow(y_rep)
 plot(density(P_scaled$log_ER, na.rm = T), main = 'Posterior predictions of ER',
      xlab = 'log ER')
@@ -353,7 +385,7 @@ png('figures/SI/BRMS_er_model_fit.png', width = 7.5, height = 7,
     units = 'in', res = 300)
 P_scaled %>%
     group_by(siteyear) %>%
-    add_epred_draws(bmod_ER, ndraws = 100) %>%
+    add_epred_draws(bmod_ER1, ndraws = 100) %>%
     mutate(.epred = exp(.epred + epsilon)) %>%
     ggplot(aes(date, ER)) +
     stat_lineribbon(aes(y = .epred)) +
@@ -390,26 +422,21 @@ dev.off()
 #     as.matrix(var_ypred/(var_ypred + var_e))
 # }
 
-draws_fit_ER <- as_draws_array(bmod_ER)
+draws_fit_ER <- as_draws_array(bmod_ER1)
 ER_pars <- posterior::summarize_draws(draws_fit_ER) %>%
-    filter(variable %in% c('b_Intercept', 'b_temp.water', 'b_light',
+    filter(variable %in% c('b_Intercept', 'b_CBP', 'b_temp.water', 'b_light',
                            'b_mean_log_Q', 'b_temp.water:mean_log_Q',
-                           'ar[1]', 'sigma',
-                           'r_site[CBP,Intercept]', 'r_site[NHC,Intercept]',
-                           'sd_site__Intercept') ) %>%
+                           'ar[1]', 'sigma') ) %>%
     mutate(model = "ER")
 
 pd <- posterior::subset_draws(draws_fit_ER,
-                              variable = c('b_Intercept', 'b_temp.water', 'b_light',
+                              variable = c('b_Intercept', 'b_CBP', 'b_temp.water', 'b_light',
                                            'b_mean_log_Q', 'b_temp.water:mean_log_Q',
-                                           'ar[1]', 'sigma',
-                                           'r_site[CBP,Intercept]',
-                                           'r_site[NHC,Intercept]'),
+                                           'ar[1]', 'sigma'),
                               draw = 1:2000)
 post_ER <- data.frame(matrix(pd, nrow = 2000, byrow = FALSE))
-colnames(post_ER) <- c('intercept', 'b_temp.water', 'b_light', 'b_meanlogQ',
-                       'b_temp.water_meanlogQ', 'phi',
-                       'sigma', 'cbp_intercept', 'nhc_intercept')
+colnames(post_ER) <- c('intercept', 'cbp_intercept', 'b_temp.water', 'b_light',
+                       'b_meanlogQ', 'b_temp.water_meanlogQ', 'phi', 'sigma')
 
 # matrix of draws from the posterior-predictive distribution
 draws <- nrow(post_ER)
@@ -455,7 +482,6 @@ hindcast_ER <- data.frame(
            ER_err_high = -exp(ER_err_high + epsilon))
 
 
-
 # plot(hindcast_ER$date, hindcast_ER$ER, type = 'l', ylim = c(-20,0))
 # for(s in sample(draws, 100)){
 #     lines(hindcast_ER$date, -exp(post_preds_ER[s,]) + epsilon,alpha = 0.1)
@@ -463,15 +489,145 @@ hindcast_ER <- data.frame(
 #
 # lines(hindcast_ER$date, hindcast_ER$ER)
 # points(hall$date, hall$ER, col = 2, pch = 20)
+#
+
+plot1 <- ggplot(hindcast_ER, aes(date, ER), col = 2) +
+    geom_ribbon(aes(ymin = ER_err_low, ymax = ER_err_high),
+                col = NA, fill = 'grey80') +
+    geom_ribbon(aes(ymin = ER_low, ymax = ER_high),
+                col = NA, fill = 'grey50') +
+    geom_line() +
+    geom_point(data = hall,  col = 2) +
+    ggtitle('ERmod1')
+
+##################################
+# model two ####
+bform_ER2 <- bf(log_ER | mi() ~ ar(p = 1) + CBP + temp.water + log_Q + lf + light)
+get_prior(bform_ER2, data = P_scaled)
+ER_priors2 <- c(prior("normal(0,1)", class = "b"),
+               prior("normal(0,5)", class = "b", coef = "CBP"),
+               prior("normal(0,5)", class = "b", coef = "light"),
+               prior("normal(0,0.2)", class = "b", coef = "temp.water"),
+               prior("normal(0,0.2)", class = "b", coef = "lf"),
+               prior("normal(0,5)", class = "Intercept"),
+               prior("cauchy(0,1)", class = "sigma"),
+               prior("beta(1,1)", class = "ar", lb = 0, ub = 1))
+bmod_ER2 <- brm(bform_ER2,
+               data = P_scaled,
+               prior = ER_priors2,
+               chains = 4, cores = 4, iter = 4000,
+               control = list(adapt_delta = 0.999,
+                              stepsize = 0.01,
+                              max_treedepth = 14))
+
+saveRDS(bmod_ER2, 'data/timeseries_model_fits/brms_ER_mod2.rds')
+# bmod_ER2 <- readRDS('data/timeseries_model_fits/brms_ER_mod2.rds')
+
+summary(bmod_ER2)
+
+png('figures/SI/BRMS_er_posterior_pred_check.png', width = 5, height = 4,
+    units = 'in', res = 300)
+
+y_rep <- posterior_predict(bmod_ER2)
+n_sims <- nrow(y_rep)
+plot(density(P_scaled$log_ER, na.rm = T), main = 'Posterior predictions of ER',
+     xlab = 'log ER')
+for(s in sample(n_sims, 100)){
+    lines(density(y_rep[s,]), col = 'grey', alpha = 0.3)
+}
+lines(density(P_scaled$log_ER, na.rm = T))
+
+dev.off()
+
+png('figures/SI/BRMS_er_model_fit.png', width = 7.5, height = 7,
+    units = 'in', res = 300)
+P_scaled %>%
+    group_by(siteyear) %>%
+    add_epred_draws(bmod_ER2, ndraws = 100) %>%
+    mutate(.epred = exp(.epred + epsilon)) %>%
+    ggplot(aes(date, ER)) +
+    stat_lineribbon(aes(y = .epred)) +
+    # geom_line(aes(y = .epred, group = paste(siteyear, .draw)), alpha = .1) +
+    geom_point(data = P_scaled, col = '#A2865C') +
+    scale_fill_brewer(palette = "Greys") +
+    facet_wrap(.~siteyear, scales = 'free', ncol = 1, strip.position = 'right')+
+    ylab(expression(paste('ER (g ', O[2], m^-2, d^-1, ')'))) +
+    xlab('Date')+
+    theme_bw()
+
+dev.off()
 
 
-# ggplot(hindcast_ER, aes(date, ER), col = 2) +
-#     geom_ribbon(aes(ymin = ER_err_low, ymax = ER_err_high),
-#                 col = NA, fill = 'grey80') +
-#     geom_ribbon(aes(ymin = ER_low, ymax = ER_high),
-#                 col = NA, fill = 'grey50') +
-#     geom_line() +
-#     geom_point(data = hall,  col = 2)
+draws_fit_ER <- as_draws_array(bmod_ER2)
+ER_pars <- posterior::summarize_draws(draws_fit_ER) %>%
+    filter(variable %in% c('b_Intercept', 'b_CBP', 'b_temp.water', 'b_light',
+                           'b_log_Q', 'b_lf',# 'b_mean_log_Q:lf',
+                           'ar[1]', 'sigma') ) %>%
+    mutate(model = "ER")
+
+pd <- posterior::subset_draws(draws_fit_ER,
+                              variable = c('b_Intercept', 'b_CBP', 'b_temp.water', 'b_light',
+                                           'b_log_Q', 'b_lf', #'b_mean_log_Q:lf',
+                                           'ar[1]', 'sigma'),
+                              draw = 1:2000)
+post_ER <- data.frame(matrix(pd, nrow = 2000, byrow = FALSE))
+colnames(post_ER) <- c('intercept', 'cbp_intercept', 'b_temp.water', 'b_light',
+                       'b_meanlogQ', 'b_lf',# 'b_meanlogQ_lf',
+                       'phi', 'sigma')
+
+# matrix of draws from the posterior-predictive distribution
+draws <- nrow(post_ER)
+post_preds_ER <- matrix(nrow = draws, ncol = nrow(hall_scaled))
+
+# fill in first observation based on the mean from the measured historical values at the site
+post_preds_ER[, 1] <- matrix(
+    rep(log(mean(-hall$ER, na.rm = T) + epsilon), each = draws),
+    nrow = draws, ncol = 1
+)
+post_preds_err_ER <- post_preds_ER
+
+for(i in 1:draws){
+    for(t in 2:nrow(hall_scaled)){
+        post_preds_ER[i, t] <- (1 - post_ER$phi[i]) * (post_ER$intercept[i] + post_ER$cbp_intercept[i]) +
+            post_ER$b_light[i] * hall_scaled$light[t] +
+            post_ER$b_temp.water[i] * hall_scaled$temp.water[t] +
+            post_ER$b_meanlogQ[i] * hall_scaled$mean_log_Q[t] +
+            post_ER$b_lf[i] * hall_scaled$lf[t] +
+           # post_ER$b_meanlogQ_lf[i] * hall_scaled$mean_log_Q[t] * hall_scaled$lf[t] +
+            post_ER$phi[i] * post_preds_ER[i, t-1] -
+            post_ER$phi[i] * (post_ER$b_light[i] * hall_scaled$light[t-1] +
+                               post_ER$b_temp.water[i] * hall_scaled$temp.water[t-1] +
+                               post_ER$b_meanlogQ[i] * hall_scaled$mean_log_Q[t-1] +
+                               post_ER$b_lf[i] * hall_scaled$lf[t-1] )#+
+                              # post_ER$b_meanlogQ_lf[i] * hall_scaled$lf[t-1] *
+                               #   hall_scaled$mean_log_Q[t-1])#
+    }
+    post_preds_err_ER[i,] <- rnorm(nrow(hall_scaled), post_preds_ER[i,], post_ER$sigma[i])
+
+}
+
+hindcast_ER <- data.frame(
+    date = hall_scaled$date,
+    ER_pred = apply(post_preds_ER, 2, mean),
+    ER_low = apply(post_preds_ER, 2, quantile, probs = 0.025),
+    ER_high = apply(post_preds_ER, 2, quantile, probs = 0.975),
+    ER_err_low = apply(post_preds_err_ER, 2, quantile, probs = 0.025),
+    ER_err_high = apply(post_preds_err_ER, 2, quantile, probs = 0.975)
+) %>%
+    mutate(ER = -exp(ER_pred) + epsilon,
+           ER_low = -exp(ER_low) + epsilon,
+           ER_high = -exp(ER_high) + epsilon,
+           ER_err_low = -exp(ER_err_low) + epsilon,
+           ER_err_high = -exp(ER_err_high + epsilon))
+
+plot2 <- ggplot(hindcast_ER, aes(date, ER), col = 2) +
+    # geom_ribbon(aes(ymin = ER_err_low, ymax = ER_err_high),
+    #             col = NA, fill = 'grey80') +
+    # geom_ribbon(aes(ymin = ER_low, ymax = ER_high),
+    #             col = NA, fill = 'grey50') +
+    geom_line() +
+    geom_point(data = hall,  col = 2) +
+    ggtitle('ERmod2')
 
 hindcast <- full_join(hindcast_GPP, hindcast_ER, by = 'date')
 

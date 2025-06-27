@@ -1,9 +1,9 @@
 ## Model Metabolism #
 # This version runs metabolism on NHC and UNHC sites using raymond K600 values as priors
 
-# update.packages(oldPkgs=c("streamMetabolizer","unitted"), dependencies=TRUE,
-#                 repos=c("http://owi.usgs.gov/R", "https://cran.rstudio.com"))
-# devtools::install_github("USGS-R/streamMetabolizer", ref="develop")
+update.packages(oldPkgs=c("streamMetabolizer","unitted"), dependencies=TRUE,
+                repos=c("http://owi.usgs.gov/R", "https://cran.rstudio.com"))
+# devtools::install_github("DOI-USGS/streamMetabolizer")
 
 library(tidyverse)
 library(streamMetabolizer)
