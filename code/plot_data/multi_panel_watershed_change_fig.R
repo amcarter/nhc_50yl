@@ -11,6 +11,7 @@ nldas <- read_csv("data/watershed/nldas.csv") %>%
                           "max_relative_humidity",
                           "min_relative_humidity",
                           "surface_downwelling_shortwave_flux_in_air"))
+nldas2 <- read_csv("data/watershed/nldas2.csv")
 
 pp_annual = read_csv('data/watershed/prism_raw.csv') %>%
   mutate(year = year(DateTime)) %>%
@@ -20,12 +21,14 @@ pp_annual = read_csv('data/watershed/prism_raw.csv') %>%
   summarize(cumulative_precip = sum(ppt_mm)/1000)
 
 all <- nldas %>%
-  pivot_wider(names_from = "variable", values_from = "value") %>%
-  select(datetime, precip_mmd = precipitation_amount)
+pivot_wider(names_from = "variable", values_from = "value") %>%
+select(datetime, precip_mmd = precipitation_amount)
 
 p90 <- quantile(all$precip_mmd, .9, na.rm = T)
-pp <- all %>%
-  group_by(year = year(datetime)) %>%
+# pp <- all %>%
+  # group_by(year = year(datetime)) %>%
+pp <- nldas2 %>%
+  group_by(year = year(date)) %>%
   summarize(zero_days = length(which(precip_mmd == 0)),
             cumulative_precip = sum(precip_mmd)/1000,
             cum90 = sum(precip_mmd[which(precip_mmd >= p90)]),
@@ -141,7 +144,7 @@ ws <- alldat %>%
 
 cc <- full_join(pp , air, by = 'year')%>%
   full_join(hydro, by = 'year') %>%
-  filter(year !=2020,
+  filter(#year !=2020,
          year >1967) %>%
   select(-n,  -peak_Q, -ar_1) %>%
   arrange(year)
@@ -312,8 +315,8 @@ pt_yrs <- c(1968, 1969, 1970, 2019, 2020)
 pt_yrs_nhc <- c(2017, 2018, 2019)
 
 
-m <- cbind(c(1, 1, 2, 2, 3, 3, 4, 4, 5, 5))
-layout(m)
+m <- cbind(c(1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6))
+layout(m, heights = c(1,1,1,1,0.1,1,1,1,1,1,1))
 library(forecast)
 #air
 par(mar = c(0,2,0,1),
@@ -352,6 +355,8 @@ points(pt_yrs, cc$cumulative_precip[cc$year %in% pt_yrs], pch = 19, col = precip
 axis(2, at = c(0.9, 1.3, 1.7), las = 2)
 mtext('Annual Precip (m)', 2, 2.7, cex = .8)
 
+plot(1,1, type = 'n', axes = FALSE, ann = FALSE)
+
 #% extreme
 m_ar1 <- forecast::Arima(cc$percent_extreme, order = c(1, 0, 0), xreg = matrix(cc$year, ncol = 1))
 plot(cc$year, cc$percent_extreme, type = 'l', lwd = 1.2, col = precip_col, axes = F)
@@ -362,8 +367,8 @@ ccc <- filter(cc, ! is.na(percent_extreme))
 m_ar1 <- forecast::Arima(ccc$percent_extreme, order = c(1, 0, 0), xreg = matrix(ccc$year, ncol = 1))
 # conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
 conf_interval <- forecast(m_ar1, xreg = ccc$year)
-lines(1979:2019, conf_interval$mean, col = dat_col)
-polygon(c(1979:2019, 2019:1979), c(conf_interval$lower[,1], rev(conf_interval$upper[,1])),
+lines(1979:2021, conf_interval$mean, col = dat_col)
+polygon(c(1979:2021, 2021:1979), c(conf_interval$lower[,1], rev(conf_interval$upper[,1])),
         col = alpha(dat_col, .3), border = NA)
 
 # lines(1979:2019, conf_interval$fit, col = precip_col)
@@ -371,7 +376,8 @@ points(pt_yrs_nhc, cc$percent_extreme[cc$year %in% pt_yrs_nhc], pch = 3, col = p
 points(pt_yrs, cc$percent_extreme[cc$year %in% pt_yrs], pch = 19, col = precip_col, cex = 1)
 # polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
 #         col = alpha(precip_col, .3), border = NA)
-text(1970, 75.5, 'slope = 2.95 ± 0.68%/decade', col = precip_col, cex = 1)
+# text(1968, 62, 'slope = 2.95 ±\n0.68%/decade', col = precip_col, cex = 1)
+text(1968, 62, 'slope = 2.16 ±\n0.63%/decade', col = precip_col, cex = 1)
 
 #no precip days
 m_ar1 <- forecast::Arima(cc$zero_days, order = c(1, 0, 0), xreg = matrix(cc$year, ncol = 1))
@@ -384,8 +390,8 @@ ccc <- filter(cc, ! is.na(zero_days))
 m_ar1 <- forecast::Arima(ccc$zero_days, order = c(1, 0, 0), xreg = matrix(ccc$year, ncol = 1))
 # conf_interval <- data.frame(predict(mm, interval="confidence", level = 0.95))
 conf_interval <- forecast(m_ar1, xreg = ccc$year)
-lines(1979:2019, conf_interval$mean, col = dat_col)
-polygon(c(1979:2019, 2019:1979), c(conf_interval$lower[,1], rev(conf_interval$upper[,1])),
+lines(1979:2021, conf_interval$mean, col = dat_col)
+polygon(c(1979:2021, 2021:1979), c(conf_interval$lower[,1], rev(conf_interval$upper[,1])),
         col = alpha(dat_col, .3), border = NA)
 
 # m_ar1 <- forecast::Arima(cc$zero_days, order = c(1, 0, 0), xreg = matrix(cc$year, ncol = 1))
@@ -395,8 +401,9 @@ points(pt_yrs_nhc, cc$zero_days[cc$year %in% pt_yrs_nhc], pch = 3, col = precip_
 points(pt_yrs, cc$zero_days[cc$year %in% pt_yrs], pch = 19, col = precip_col, cex = 1)
 # polygon(c(1979:2019, 2019:1979), c(conf_interval$lwr, rev(conf_interval$upr)),
 #         col = alpha(precip_col, .3), border = NA)
-text(1970, 224, 'slope = 12.1 ± 2.4 days/decade', col = precip_col, cex = 1)
-rect(1967, 56.2, 2021, 537, xpd = NA)
+# text(1968, 131, 'slope = 12.1 ±\n2.4 days/decade', col = precip_col, cex = 1, xpd=NA)
+text(1968, 131, 'slope = 9.2 ±\n2.3 days/decade', col = precip_col, cex = 1, xpd=NA)
+rect(1966.9, 5.5, 2021.1, 578, xpd = NA)
 
 drought_col <- "firebrick3"
 d <- read_csv("data/other_watershed_stuff/PDSI_timeseries.csv")
