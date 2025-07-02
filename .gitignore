@@ -22,4 +22,5 @@ data_bak
 map_files_archived/map_files
 *.zip
 code/analyze_data/*.rds
+*.DS_Store
 figures/gifs
