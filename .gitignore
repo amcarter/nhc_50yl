@@ -24,3 +24,4 @@ map_files_archived/map_files
 code/analyze_data/*.rds
 *.DS_Store
 figures/gifs
+*.swp

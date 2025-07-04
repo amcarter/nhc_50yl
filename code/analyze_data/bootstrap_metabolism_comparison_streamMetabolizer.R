@@ -1,4 +1,5 @@
 # Bootstrap Metabolism comparison NHC SP data and Hall data #####
+library(readr)
 library(viridis)
 library(beanplot)
 library(scales)
@@ -298,6 +299,8 @@ bootstrapped_dat %>%
         geom_point(aes(y = ER), pch = 1) +
         facet_wrap(.~data) +
     theme_bw()
+
+ggsave('figures/seasonally_bootstrapped_metabolism.png', width = 10, height = 6)
 
 
 ggplot(historic_sum_dat, aes(doy, GPP_med)) +
