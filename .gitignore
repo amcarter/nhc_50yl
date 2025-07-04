@@ -25,3 +25,6 @@ code/analyze_data/*.rds
 *.DS_Store
 figures/gifs
 *.swp
+data/timeseries_model_fits/brms_ER_mod2.rds
+data/timeseries_model_fits/brms_ER_mod3.rds
+data/timeseries_model_fits/brms_GPP_mod2.rds

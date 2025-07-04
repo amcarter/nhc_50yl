@@ -226,7 +226,34 @@ GPP_priors <- c(prior("normal(0,5)", class = "b"),
 # saveRDS(bmod_GPP, 'data/timeseries_model_fits/brms_GPP_mod.rds')
 bmod_GPP <- readRDS('data/timeseries_model_fits/brms_GPP_mod.rds')
 
-summary(bmod_GPP)
+bform_GPP2 <- bf(log_GPP | mi() ~ ar(p = 1) + (1|site) + log_Q + temp.water + light)
+get_prior(bform_GPP2, data = P_scaled)
+GPP_priors <- c(prior("normal(0,5)", class = "b"),
+                prior("normal(0,0.2)", class = "b", coef = "temp.water"),
+                prior("beta(1,1)", class = "ar", lb = 0, ub = 1),
+                prior("normal(0,5)", class = "Intercept"),
+                prior("cauchy(0,1)", class = "sigma"))
+
+# bmod_GPP2 <- brm(bform_GPP2,
+#                 data = P_scaled,
+#                 chains = 4, cores = 4, iter = 4000,
+#                 prior = GPP_priors,
+#                 control = list(adapt_delta = 0.999,
+#                                stepsize = 0.01,
+#                                max_treedepth = 14) )
+#
+# # evaluate model fit:
+# saveRDS(bmod_GPP2, 'data/timeseries_model_fits/brms_GPP_mod2.rds')
+bmod_GPP2 <- readRDS('data/timeseries_model_fits/brms_GPP_mod2.rds')
+P_scaled_nona <- na.omit(P_scaled)
+bayes_R2(bmod_GPP, newdata = P_scaled_nona)
+bayes_R2(bmod_GPP2, newdata = P_scaled_nona)
+loo_compare(loo(bmod_GPP, newdata = P_scaled_nona),
+            loo(bmod_GPP2, newdata = P_scaled_nona))
+
+summary(bmod_GPP2)
+
+
 
 png('figures/SI/BRMS_gpp_posterior_pred_check.png', width = 5, height = 4,
     units = 'in', res = 300)
@@ -356,18 +383,70 @@ ER_priors1 <- c(prior("normal(0,1)", class = "b"),
                prior("normal(0,5)", class = "Intercept"),
                prior("cauchy(0,1)", class = "sigma"),
                prior("beta(1,1)", class = "ar", lb = 0, ub = 1))
-bmod_ER1 <- brm(bform_ER1,
-               data = P_scaled,
-               prior = ER_priors1,
-               chains = 4, cores = 4, iter = 4000,
-               control = list(adapt_delta = 0.999,
-                              stepsize = 0.01,
-                              max_treedepth = 14))
-
-saveRDS(bmod_ER1, 'data/timeseries_model_fits/brms_ER_mod.rds')
-# bmod_ER1 <- readRDS('data/timeseries_model_fits/brms_ER_mod.rds')
+# bmod_ER1 <- brm(bform_ER1,
+#                data = P_scaled,
+#                prior = ER_priors1,
+#                chains = 4, cores = 4, iter = 4000,
+#                control = list(adapt_delta = 0.999,
+#                               stepsize = 0.01,
+#                               max_treedepth = 14))
+#
+# saveRDS(bmod_ER1, 'data/timeseries_model_fits/brms_ER_mod.rds')
+bmod_ER1 <- readRDS('data/timeseries_model_fits/brms_ER_mod.rds')
 
 summary(bmod_ER1)
+
+bform_ER2 <- bf(log_ER | mi() ~ ar(p = 1) + CBP + temp.water+log_Q + light)
+# bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*med_log_Q + light)
+get_prior(bform_ER2, data = P_scaled)
+ER_priors2 <- c(prior("normal(0,1)", class = "b"),
+               prior("normal(0,5)", class = "b", coef = "CBP"),
+               prior("normal(0,5)", class = "b", coef = "light"),
+               prior("normal(0,0.2)", class = "b", coef = "temp.water"),
+               prior("normal(0,5)", class = "Intercept"),
+               prior("cauchy(0,1)", class = "sigma"),
+               prior("beta(1,1)", class = "ar", lb = 0, ub = 1))
+# bmod_ER2 <- brm(bform_ER2,
+#                data = P_scaled,
+#                prior = ER_priors2,
+#                chains = 4, cores = 4, iter = 4000,
+#                control = list(adapt_delta = 0.999,
+#                               stepsize = 0.01,
+#                               max_treedepth = 14))
+#
+# saveRDS(bmod_ER2, 'data/timeseries_model_fits/brms_ER_mod2.rds')
+bmod_ER2 <- readRDS('data/timeseries_model_fits/brms_ER_mod2.rds')
+
+summary(bmod_ER2)
+
+bform_ER3 <- bf(log_ER | mi() ~ ar(p = 1) + CBP + temp.water*log_Q + light)
+# bform_ER <- bf(log_ER | mi() ~ ar(p = 1) + (1|site) + temp.water*med_log_Q + light)
+get_prior(bform_ER3, data = P_scaled)
+ER_priors3 <- c(prior("normal(0,1)", class = "b"),
+               prior("normal(0,5)", class = "b", coef = "CBP"),
+               prior("normal(0,5)", class = "b", coef = "light"),
+               prior("normal(0,0.2)", class = "b", coef = "temp.water"),
+               prior("normal(0,5)", class = "Intercept"),
+               prior("cauchy(0,1)", class = "sigma"),
+               prior("beta(1,1)", class = "ar", lb = 0, ub = 1))
+# bmod_ER3 <- brm(bform_ER3,
+#                data = P_scaled,
+#                prior = ER_priors3,
+#                chains = 4, cores = 4, iter = 4000,
+#                control = list(adapt_delta = 0.999,
+#                               stepsize = 0.01,
+#                               max_treedepth = 14))
+#
+# saveRDS(bmod_ER3, 'data/timeseries_model_fits/brms_ER_mod3.rds')
+bmod_ER3 <- readRDS('data/timeseries_model_fits/brms_ER_mod.rds')
+
+summary(bmod_ER3)
+
+# compare model fits:
+loo_compare(loo(bmod_ER1, newdata = P_scaled_nona),
+            loo(bmod_ER2, newdata = P_scaled_nona),
+            loo(bmod_ER3, newdata = P_scaled_nona))
+
 
 png('figures/SI/BRMS_er_posterior_pred_check.png', width = 5, height = 4,
     units = 'in', res = 300)
@@ -502,134 +581,134 @@ plot1 <- ggplot(hindcast_ER, aes(date, ER), col = 2) +
     geom_point(data = hall,  col = 2) +
     ggtitle('ERmod1')
 
-##################################
-# model two ####
-bform_ER2 <- bf(log_ER | mi() ~ ar(p = 1) + CBP + temp.water + log_Q + lf + light)
-get_prior(bform_ER2, data = P_scaled)
-ER_priors2 <- c(prior("normal(0,1)", class = "b"),
-               prior("normal(0,5)", class = "b", coef = "CBP"),
-               prior("normal(0,5)", class = "b", coef = "light"),
-               prior("normal(0,0.2)", class = "b", coef = "temp.water"),
-               prior("normal(0,0.2)", class = "b", coef = "lf"),
-               prior("normal(0,5)", class = "Intercept"),
-               prior("cauchy(0,1)", class = "sigma"),
-               prior("beta(1,1)", class = "ar", lb = 0, ub = 1))
-bmod_ER2 <- brm(bform_ER2,
-               data = P_scaled,
-               prior = ER_priors2,
-               chains = 4, cores = 4, iter = 4000,
-               control = list(adapt_delta = 0.999,
-                              stepsize = 0.01,
-                              max_treedepth = 14))
-
-saveRDS(bmod_ER2, 'data/timeseries_model_fits/brms_ER_mod2.rds')
-# bmod_ER2 <- readRDS('data/timeseries_model_fits/brms_ER_mod2.rds')
-
-summary(bmod_ER2)
-
-png('figures/SI/BRMS_er_posterior_pred_check.png', width = 5, height = 4,
-    units = 'in', res = 300)
-
-y_rep <- posterior_predict(bmod_ER2)
-n_sims <- nrow(y_rep)
-plot(density(P_scaled$log_ER, na.rm = T), main = 'Posterior predictions of ER',
-     xlab = 'log ER')
-for(s in sample(n_sims, 100)){
-    lines(density(y_rep[s,]), col = 'grey', alpha = 0.3)
-}
-lines(density(P_scaled$log_ER, na.rm = T))
-
-dev.off()
-
-png('figures/SI/BRMS_er_model_fit.png', width = 7.5, height = 7,
-    units = 'in', res = 300)
-P_scaled %>%
-    group_by(siteyear) %>%
-    add_epred_draws(bmod_ER2, ndraws = 100) %>%
-    mutate(.epred = exp(.epred + epsilon)) %>%
-    ggplot(aes(date, ER)) +
-    stat_lineribbon(aes(y = .epred)) +
-    # geom_line(aes(y = .epred, group = paste(siteyear, .draw)), alpha = .1) +
-    geom_point(data = P_scaled, col = '#A2865C') +
-    scale_fill_brewer(palette = "Greys") +
-    facet_wrap(.~siteyear, scales = 'free', ncol = 1, strip.position = 'right')+
-    ylab(expression(paste('ER (g ', O[2], m^-2, d^-1, ')'))) +
-    xlab('Date')+
-    theme_bw()
-
-dev.off()
-
-
-draws_fit_ER <- as_draws_array(bmod_ER2)
-ER_pars <- posterior::summarize_draws(draws_fit_ER) %>%
-    filter(variable %in% c('b_Intercept', 'b_CBP', 'b_temp.water', 'b_light',
-                           'b_log_Q', 'b_lf',# 'b_mean_log_Q:lf',
-                           'ar[1]', 'sigma') ) %>%
-    mutate(model = "ER")
-
-pd <- posterior::subset_draws(draws_fit_ER,
-                              variable = c('b_Intercept', 'b_CBP', 'b_temp.water', 'b_light',
-                                           'b_log_Q', 'b_lf', #'b_mean_log_Q:lf',
-                                           'ar[1]', 'sigma'),
-                              draw = 1:2000)
-post_ER <- data.frame(matrix(pd, nrow = 2000, byrow = FALSE))
-colnames(post_ER) <- c('intercept', 'cbp_intercept', 'b_temp.water', 'b_light',
-                       'b_meanlogQ', 'b_lf',# 'b_meanlogQ_lf',
-                       'phi', 'sigma')
-
-# matrix of draws from the posterior-predictive distribution
-draws <- nrow(post_ER)
-post_preds_ER <- matrix(nrow = draws, ncol = nrow(hall_scaled))
-
-# fill in first observation based on the mean from the measured historical values at the site
-post_preds_ER[, 1] <- matrix(
-    rep(log(mean(-hall$ER, na.rm = T) + epsilon), each = draws),
-    nrow = draws, ncol = 1
-)
-post_preds_err_ER <- post_preds_ER
-
-for(i in 1:draws){
-    for(t in 2:nrow(hall_scaled)){
-        post_preds_ER[i, t] <- (1 - post_ER$phi[i]) * (post_ER$intercept[i] + post_ER$cbp_intercept[i]) +
-            post_ER$b_light[i] * hall_scaled$light[t] +
-            post_ER$b_temp.water[i] * hall_scaled$temp.water[t] +
-            post_ER$b_meanlogQ[i] * hall_scaled$mean_log_Q[t] +
-            post_ER$b_lf[i] * hall_scaled$lf[t] +
-           # post_ER$b_meanlogQ_lf[i] * hall_scaled$mean_log_Q[t] * hall_scaled$lf[t] +
-            post_ER$phi[i] * post_preds_ER[i, t-1] -
-            post_ER$phi[i] * (post_ER$b_light[i] * hall_scaled$light[t-1] +
-                               post_ER$b_temp.water[i] * hall_scaled$temp.water[t-1] +
-                               post_ER$b_meanlogQ[i] * hall_scaled$mean_log_Q[t-1] +
-                               post_ER$b_lf[i] * hall_scaled$lf[t-1] )#+
-                              # post_ER$b_meanlogQ_lf[i] * hall_scaled$lf[t-1] *
-                               #   hall_scaled$mean_log_Q[t-1])#
-    }
-    post_preds_err_ER[i,] <- rnorm(nrow(hall_scaled), post_preds_ER[i,], post_ER$sigma[i])
-
-}
-
-hindcast_ER <- data.frame(
-    date = hall_scaled$date,
-    ER_pred = apply(post_preds_ER, 2, mean),
-    ER_low = apply(post_preds_ER, 2, quantile, probs = 0.025),
-    ER_high = apply(post_preds_ER, 2, quantile, probs = 0.975),
-    ER_err_low = apply(post_preds_err_ER, 2, quantile, probs = 0.025),
-    ER_err_high = apply(post_preds_err_ER, 2, quantile, probs = 0.975)
-) %>%
-    mutate(ER = -exp(ER_pred) + epsilon,
-           ER_low = -exp(ER_low) + epsilon,
-           ER_high = -exp(ER_high) + epsilon,
-           ER_err_low = -exp(ER_err_low) + epsilon,
-           ER_err_high = -exp(ER_err_high + epsilon))
-
-plot2 <- ggplot(hindcast_ER, aes(date, ER), col = 2) +
-    # geom_ribbon(aes(ymin = ER_err_low, ymax = ER_err_high),
-    #             col = NA, fill = 'grey80') +
-    # geom_ribbon(aes(ymin = ER_low, ymax = ER_high),
-    #             col = NA, fill = 'grey50') +
-    geom_line() +
-    geom_point(data = hall,  col = 2) +
-    ggtitle('ERmod2')
+# ##################################
+# # model two ####
+# bform_ER2 <- bf(log_ER | mi() ~ ar(p = 1) + CBP + temp.water + log_Q + lf + light)
+# get_prior(bform_ER2, data = P_scaled)
+# ER_priors2 <- c(prior("normal(0,1)", class = "b"),
+#                prior("normal(0,5)", class = "b", coef = "CBP"),
+#                prior("normal(0,5)", class = "b", coef = "light"),
+#                prior("normal(0,0.2)", class = "b", coef = "temp.water"),
+#                prior("normal(0,0.2)", class = "b", coef = "lf"),
+#                prior("normal(0,5)", class = "Intercept"),
+#                prior("cauchy(0,1)", class = "sigma"),
+#                prior("beta(1,1)", class = "ar", lb = 0, ub = 1))
+# bmod_ER2 <- brm(bform_ER2,
+#                data = P_scaled,
+#                prior = ER_priors2,
+#                chains = 4, cores = 4, iter = 4000,
+#                control = list(adapt_delta = 0.999,
+#                               stepsize = 0.01,
+#                               max_treedepth = 14))
+#
+# saveRDS(bmod_ER2, 'data/timeseries_model_fits/brms_ER_mod2.rds')
+# # bmod_ER2 <- readRDS('data/timeseries_model_fits/brms_ER_mod2.rds')
+#
+# summary(bmod_ER2)
+#
+# png('figures/SI/BRMS_er_posterior_pred_check.png', width = 5, height = 4,
+#     units = 'in', res = 300)
+#
+# y_rep <- posterior_predict(bmod_ER2)
+# n_sims <- nrow(y_rep)
+# plot(density(P_scaled$log_ER, na.rm = T), main = 'Posterior predictions of ER',
+#      xlab = 'log ER')
+# for(s in sample(n_sims, 100)){
+#     lines(density(y_rep[s,]), col = 'grey', alpha = 0.3)
+# }
+# lines(density(P_scaled$log_ER, na.rm = T))
+#
+# dev.off()
+#
+# png('figures/SI/BRMS_er_model_fit.png', width = 7.5, height = 7,
+#     units = 'in', res = 300)
+# P_scaled %>%
+#     group_by(siteyear) %>%
+#     add_epred_draws(bmod_ER2, ndraws = 100) %>%
+#     mutate(.epred = exp(.epred + epsilon)) %>%
+#     ggplot(aes(date, ER)) +
+#     stat_lineribbon(aes(y = .epred)) +
+#     # geom_line(aes(y = .epred, group = paste(siteyear, .draw)), alpha = .1) +
+#     geom_point(data = P_scaled, col = '#A2865C') +
+#     scale_fill_brewer(palette = "Greys") +
+#     facet_wrap(.~siteyear, scales = 'free', ncol = 1, strip.position = 'right')+
+#     ylab(expression(paste('ER (g ', O[2], m^-2, d^-1, ')'))) +
+#     xlab('Date')+
+#     theme_bw()
+#
+# dev.off()
+#
+#
+# draws_fit_ER <- as_draws_array(bmod_ER2)
+# ER_pars <- posterior::summarize_draws(draws_fit_ER) %>%
+#     filter(variable %in% c('b_Intercept', 'b_CBP', 'b_temp.water', 'b_light',
+#                            'b_log_Q', 'b_lf',# 'b_mean_log_Q:lf',
+#                            'ar[1]', 'sigma') ) %>%
+#     mutate(model = "ER")
+#
+# pd <- posterior::subset_draws(draws_fit_ER,
+#                               variable = c('b_Intercept', 'b_CBP', 'b_temp.water', 'b_light',
+#                                            'b_log_Q', 'b_lf', #'b_mean_log_Q:lf',
+#                                            'ar[1]', 'sigma'),
+#                               draw = 1:2000)
+# post_ER <- data.frame(matrix(pd, nrow = 2000, byrow = FALSE))
+# colnames(post_ER) <- c('intercept', 'cbp_intercept', 'b_temp.water', 'b_light',
+#                        'b_meanlogQ', 'b_lf',# 'b_meanlogQ_lf',
+#                        'phi', 'sigma')
+#
+# # matrix of draws from the posterior-predictive distribution
+# draws <- nrow(post_ER)
+# post_preds_ER <- matrix(nrow = draws, ncol = nrow(hall_scaled))
+#
+# # fill in first observation based on the mean from the measured historical values at the site
+# post_preds_ER[, 1] <- matrix(
+#     rep(log(mean(-hall$ER, na.rm = T) + epsilon), each = draws),
+#     nrow = draws, ncol = 1
+# )
+# post_preds_err_ER <- post_preds_ER
+#
+# for(i in 1:draws){
+#     for(t in 2:nrow(hall_scaled)){
+#         post_preds_ER[i, t] <- (1 - post_ER$phi[i]) * (post_ER$intercept[i] + post_ER$cbp_intercept[i]) +
+#             post_ER$b_light[i] * hall_scaled$light[t] +
+#             post_ER$b_temp.water[i] * hall_scaled$temp.water[t] +
+#             post_ER$b_meanlogQ[i] * hall_scaled$mean_log_Q[t] +
+#             post_ER$b_lf[i] * hall_scaled$lf[t] +
+#            # post_ER$b_meanlogQ_lf[i] * hall_scaled$mean_log_Q[t] * hall_scaled$lf[t] +
+#             post_ER$phi[i] * post_preds_ER[i, t-1] -
+#             post_ER$phi[i] * (post_ER$b_light[i] * hall_scaled$light[t-1] +
+#                                post_ER$b_temp.water[i] * hall_scaled$temp.water[t-1] +
+#                                post_ER$b_meanlogQ[i] * hall_scaled$mean_log_Q[t-1] +
+#                                post_ER$b_lf[i] * hall_scaled$lf[t-1] )#+
+#                               # post_ER$b_meanlogQ_lf[i] * hall_scaled$lf[t-1] *
+#                                #   hall_scaled$mean_log_Q[t-1])#
+#     }
+#     post_preds_err_ER[i,] <- rnorm(nrow(hall_scaled), post_preds_ER[i,], post_ER$sigma[i])
+#
+# }
+#
+# hindcast_ER <- data.frame(
+#     date = hall_scaled$date,
+#     ER_pred = apply(post_preds_ER, 2, mean),
+#     ER_low = apply(post_preds_ER, 2, quantile, probs = 0.025),
+#     ER_high = apply(post_preds_ER, 2, quantile, probs = 0.975),
+#     ER_err_low = apply(post_preds_err_ER, 2, quantile, probs = 0.025),
+#     ER_err_high = apply(post_preds_err_ER, 2, quantile, probs = 0.975)
+# ) %>%
+#     mutate(ER = -exp(ER_pred) + epsilon,
+#            ER_low = -exp(ER_low) + epsilon,
+#            ER_high = -exp(ER_high) + epsilon,
+#            ER_err_low = -exp(ER_err_low) + epsilon,
+#            ER_err_high = -exp(ER_err_high + epsilon))
+#
+# plot2 <- ggplot(hindcast_ER, aes(date, ER), col = 2) +
+#     # geom_ribbon(aes(ymin = ER_err_low, ymax = ER_err_high),
+#     #             col = NA, fill = 'grey80') +
+#     # geom_ribbon(aes(ymin = ER_low, ymax = ER_high),
+#     #             col = NA, fill = 'grey50') +
+#     geom_line() +
+#     geom_point(data = hall,  col = 2) +
+#     ggtitle('ERmod2')
 
 hindcast <- full_join(hindcast_GPP, hindcast_ER, by = 'date')
 
