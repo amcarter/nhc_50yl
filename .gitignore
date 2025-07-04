@@ -6,12 +6,8 @@
 #folders to ignore
 model/model_runs
 data/longitudinal_sampling
-data/watershed
-data/watershed_boundary
-data/nlcd
 data/nwalt
-data/other_watershed_stuff
-data/prism_raw
+data/prism_raw/PRISM_ppt_stable*
 data/metabolism/raw
 data/metabolism/modeled
 data/metabolism/processed
