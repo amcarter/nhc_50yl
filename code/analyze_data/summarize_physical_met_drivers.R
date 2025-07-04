@@ -4,7 +4,8 @@ dat <- read_csv("data/metabolism/compiled/metabolism_and_drivers.csv")
 dat %>%
     mutate(v_mh = avg_velocity * 60 * 60,
            k600 = K600/depth,
-           kO2 = streamMetabolizer::convert_k600_to_kGAS(k600, temp.water, gas = "O2"),
+           kO2 = streamMetabolizer::convert_k600_to_kGAS(k600, temp.water,
+                                                         gas = "O2"),
            kO2_h = kO2/24,
            reach_length_95 = 3 * v_mh/kO2_h/1000,
            year = case_when(site == "NHC" & year == 2020 ~ 2021,
