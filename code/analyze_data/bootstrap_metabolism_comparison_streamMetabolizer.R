@@ -138,51 +138,53 @@ new_year_agg = sort(as.Date(new_year_agg))
 ny_num = as.numeric(new_year_agg)
 
 tiff(filename = 'figures/seasonalcoverage.tif',
-     width = 6, height = 2.05, res = 800, units = 'in')
-     # width = 6 * 800, height = 2.05 * 800, res = 800, units = 'px')
+     width = 6, height = 2.5, res = 300, units = 'in')
+# width = 6 * 800, height = 2.05 * 800, res = 800, units = 'px')
 
-    lims = c(min(ny_num), max(ny_num))
+lims = c(min(ny_num), max(ny_num))
 
-    par(mfrow=c(2,1), mar=c(0,0,0,0), oma=c(3,4,2,3))
+par(mfrow=c(2,1), mar=c(0,0,0,0), oma=c(3,4,2,3))
 
-    beanplot(ny_num, horizontal = TRUE, col = now_col, xaxt = 'n',
-             frame.plot = FALSE, ylim = lims)
-    mtext('2019', 2, line = 1, adj = .7)
-    mtext(paste('n =', length(! is.na(ny_num))), 2, cex = .7)
-    mtext('Annual Sampling Coverage', 3, line = .1, cex = .8)
+beanplot(ny_num, horizontal = TRUE, col = now_col, xaxt = 'n',
+         frame.plot = FALSE, ylim = lims)
+mtext('2019-20', 2, line = 1, adj = .7)
+mtext(paste('n =', length(! is.na(ny_num))), 2, cex = .7)
+mtext('Annual Sampling Coverage', 3, line = .1, cex = .8)
 
-    beanplot(hy_num, horizontal = TRUE, col=then_col, xaxt = 'n',
-             frame.plot = FALSE, ylim = lims)
-    mtext(paste('n =', length(! is.na(hy_num))), 2, cex = .7)
-    mtext('1968-70', 2, line = 1, adj = 1)
-    axis(1, at=seq(as.Date('2020-01-01'), as.Date('2021-01-01'),
-                   length.out=13)[1:13], labels = FALSE)
-    axis(1, at=seq(as.Date('2020-01-01'), as.Date('2021-01-01'), length.out=13)[1:12],
-         labels=month.abb, cex.axis = .8)
+beanplot(hy_num, horizontal = TRUE, col=then_col, xaxt = 'n',
+         frame.plot = FALSE, ylim = lims)
+# mtext(paste('n =', length(! is.na(hy_num))), 2, cex = .7)
+mtext(paste('n =', 57), 2, cex = .7)
+mtext('1968-70', 2, line = 1, adj = 1)
+axis(1, at=seq(as.Date('2020-01-01'), as.Date('2021-01-01'),
+               length.out=13)[1:13], labels = FALSE)
+axis(1, at=seq(as.Date('2020-01-01'), as.Date('2021-01-01'), length.out=13)[1:12],
+     labels=month.abb, cex.axis = .8)
 
 dev.off()
 
-png(width = 6, height=2.05, units='in', type='cairo', res=300,
+png(width = 6, height=2.5, units='in', type='cairo', res=300,
     filename='figures/seasonalcoverage.png')
 
-    lims = c(min(ny_num), max(ny_num))
+lims = c(min(ny_num), max(ny_num))
 
-    par(mfrow=c(2,1), mar=c(0,0,0,0), oma=c(3,4,2,3))
+par(mfrow=c(2,1), mar=c(0,0,0,0), oma=c(3,4,2,3))
 
-    beanplot(ny_num, horizontal = TRUE, col = now_col, xaxt = 'n',
-             frame.plot = FALSE, ylim = lims)
-    mtext('2019', 2, line = 1, adj = .7)
-    mtext(paste('n =', length(! is.na(ny_num))), 2, cex = .7)
-    mtext('Annual Sampling Coverage', 3, line = .1, cex = .8)
+beanplot(ny_num, horizontal = TRUE, col = now_col, xaxt = 'n',
+         frame.plot = FALSE, ylim = lims)
+mtext('2019-20', 2, line = 1, adj = .7)
+mtext(paste('n =', length(! is.na(ny_num))), 2, cex = .7)
+mtext('Annual Sampling Coverage', 3, line = .1, cex = .8)
 
-    beanplot(hy_num, horizontal = TRUE, col=then_col, xaxt = 'n',
-             frame.plot = FALSE, ylim = lims)
-    mtext(paste('n =', length(! is.na(hy_num))), 2, cex = .7)
-    mtext('1968-70', 2, line = 1, adj = 1)
-    axis(1, at=seq(as.Date('2020-01-01'), as.Date('2021-01-01'),
-                   length.out=13)[1:13], labels = FALSE)
-    axis(1, at=seq(as.Date('2020-01-01'), as.Date('2021-01-01'), length.out=13)[1:12],
-         labels=month.abb, cex.axis = .8)
+beanplot(hy_num, horizontal = TRUE, col=then_col, xaxt = 'n',
+         frame.plot = FALSE, ylim = lims)
+# mtext(paste('n =', length(! is.na(hy_num))), 2, cex = .7)
+mtext(paste('n =', 57), 2, cex = .7)
+mtext('1968-70', 2, line = 1, adj = 1)
+axis(1, at=seq(as.Date('2020-01-01'), as.Date('2021-01-01'),
+               length.out=13)[1:13], labels = FALSE)
+axis(1, at=seq(as.Date('2020-01-01'), as.Date('2021-01-01'), length.out=13)[1:12],
+     labels=month.abb, cex.axis = .8)
 
 dev.off()
 
