@@ -26,6 +26,8 @@ hall_QT <- read_csv('data/hall_data/hall_discharge_temp_daily.csv') %>%
 # historical air temperature trend:
 airtemp <- read_csv('data/watershed/noaa_air_temp.csv') %>%
     rename(temp_C = temp_mean)
+airtemp <- read_csv('data/watershed/nldas2.csv') %>%
+    rename(temp_C = temp_mean)
 
 P <- dat %>%
     select(date, site,ER,  GPP, GPP.lower, GPP.upper, discharge,
@@ -223,6 +225,7 @@ GPP_priors <- c(prior("normal(0,5)", class = "b"),
 # evaluate model fit:
 # saveRDS(bmod_GPP, 'data/timeseries_model_fits/brms_GPP_mod.rds')
 bmod_GPP <- readRDS('data/timeseries_model_fits/brms_GPP_mod.rds')
+summary(bmod_GPP)
 
 bform_GPP2 <- bf(log_GPP | mi() ~ ar(p = 1) + (1|site) + log_Q + temp.water + light)
 get_prior(bform_GPP2, data = P_scaled)
@@ -436,7 +439,7 @@ ER_priors3 <- c(prior("normal(0,1)", class = "b"),
 #                               max_treedepth = 14))
 #
 # saveRDS(bmod_ER3, 'data/timeseries_model_fits/brms_ER_mod3.rds')
-bmod_ER3 <- readRDS('data/timeseries_model_fits/brms_ER_mod.rds')
+bmod_ER3 <- readRDS('data/timeseries_model_fits/brms_ER_mod3.rds')
 
 summary(bmod_ER3)
 
@@ -904,7 +907,8 @@ dev.off()
 
 # average discharge across today and 1970 datasets:
 comb_dat <- bind_rows(select(P[P$site == 'CBP',], date, log_Q, temp.water),
-          select(hall_preds[hall_preds$site == 'CBP',], date, log_Q, temp.water)) %>%
+          select(hall_preds[hall_preds$site == 'CBP',],
+                 date, log_Q, temp.water)) %>%
     mutate(doy = format(date, '%j')) %>%
     left_join(airtemp, by = 'date') %>% ungroup()
 
@@ -946,14 +950,6 @@ Q_sum <- met_change %>%
 
 Q_sum2 <- read_csv('data/rating_curves/modeled_fall_mean_NHC_flow.csv') %>%
     mutate(mean_log_Q = log(fall_mean))
-
-
-met_change_scaled <- met_change %>%
-    left_join(Q_sum, by = 'year') %>%
-    select(-temp_C) %>%
-    mutate(log_Q = (log_Q - scaling_pars$log_Q_mean)/scaling_pars$log_Q_sd,
-           light = (light - scaling_pars$light_mean)/scaling_pars$light_sd,
-           temp.water = (temp.water - scaling_pars$temp.water_mean)/scaling_pars$temp.water_sd)
 
 met_change_scaled <- met_change %>%
     right_join(Q_sum2, by = 'year') %>%
@@ -1070,6 +1066,7 @@ met_plot <- hindcast %>%
           strip.text = element_blank(),
           # legend.key.width = unit(0.3, 'in'),
           legend.position = 'inside',
+          legend.background = element_rect(fill = NA),
           legend.position.inside = c(.09, .18))
           # legend.direction = 'horizontal')
           # legend.position = 'top')
@@ -1105,11 +1102,11 @@ clim_plot <- met_change3 %>%
 
 tiff('figures/Annual_hindcast_trajectory_4panel.tiff', width = 9, height = 5,
      units = 'in', res = 300)
-ggpubr::ggarrange(met_plot, clim_plot, widths = c(2,1))#, common.legend = TRUE )
+ggpubr::ggarrange(met_plot, clim_plot, widths = c(2,1), labels = "auto")#, common.legend = TRUE )
 dev.off()
 png('figures/Annual_hindcast_trajectory_4panel.png', width = 9, height = 5,
      units = 'in', res = 300)
-ggpubr::ggarrange(met_plot, clim_plot, widths = c(2,1))#, common.legend = TRUE )
+ggpubr::ggarrange(met_plot, clim_plot, widths = c(2,1), labels = "auto")#, common.legend = TRUE )
 dev.off()
 
 tiff('figures/Annual_hindcast_trajectory.tiff', width = 4, height = 3,
@@ -1117,12 +1114,12 @@ tiff('figures/Annual_hindcast_trajectory.tiff', width = 4, height = 3,
 
 hindcast %>%
     group_by(year) %>%
-    summarize(GPP_mean = sum(GPP),
-              ER_mean = sum(ER),
-              GPP_low = sum(GPP_low),
-              GPP_high = sum(GPP_high),
-              ER_low = sum(ER_low),
-              ER_high = sum(ER_high),
+    summarize(GPP_mean = mean(GPP),
+              ER_mean = mean(ER),
+              GPP_low = mean(GPP_low),
+              GPP_high = mean(GPP_high),
+              ER_low = mean(ER_low),
+              ER_high = mean(ER_high),
               GPP_sd = sd(GPP)*365,
               ER_sd = sd(ER)*365) %>%
     pivot_longer(cols = starts_with(c('GPP', 'ER')),
@@ -1144,7 +1141,69 @@ hindcast %>%
     theme(legend.position = 'none')
 
 dev.off()
+png('figures/monthly_hindcast_trajectory.png', width = 6.5, height = 4.5,
+     units = 'in', res = 300)
 
+hindcast %>%
+    mutate(month = month(date)) %>%
+    group_by(year, month) %>%
+    summarize(GPP_mean = mean(GPP),
+              ER_mean = mean(ER),
+              GPP_low = mean(GPP_low),
+              GPP_high = mean(GPP_high),
+              ER_low = mean(ER_low),
+              ER_high = mean(ER_high),
+              GPP_sd = sd(GPP)*365,
+              ER_sd = sd(ER)*365) %>%
+    pivot_longer(cols = starts_with(c('GPP', 'ER')),
+                 names_to = c('met', 'stat'),
+                 names_sep = '_',
+                 values_to = 'value') %>%
+    pivot_wider(values_from = 'value', names_from = 'stat' ) %>%
+    mutate(met = factor(met, levels = c('GPP', 'ER')),
+           date = as.Date(paste0(year, "-", month, "-01"), format = "%Y-%m-%d")) %>%
+    ggplot(aes(date, mean))+
+    geom_ribbon(aes(ymin = low,
+                    ymax = high, fill = met),
+                col = NA, alpha = 0.5) +
+    geom_line() +
+    scale_fill_manual(name = '', values = c("#3b7c70", "#ce9642"))+
+    facet_wrap(.~met, ncol = 1, scales = 'free_y', strip.position = 'right')+
+    ylab(expression(paste('Annual Metabolism (g ', O[2], m^-2, d^-1, ')'))) +
+    xlab('Year') +
+    theme_bw() +
+    theme(legend.position = 'none')
+
+dev.off()
+
+
+# test for a slope:
+
+library(forecast)
+decompose(hindcast$GPP)
+m <- decompose(ts(hindcast$ER, frequency = 365.25, start = c(1985, 1)))
+plot(m)
+ann_means <- hindcast %>%
+    mutate(month = month(date),
+           year = year - 1985) %>%
+    group_by(year) %>%
+    summarize(GPP_mean = 365*mean(GPP),
+              ER_mean = 365*mean(ER),
+              GPP_low = mean(GPP_low),
+              GPP_high = mean(GPP_high),
+              ER_low = mean(ER_low),
+              ER_high = mean(ER_high),
+              GPP_sd = sd(GPP)*365,
+              ER_sd = sd(ER)*365)
+
+summary(lm(GPP_mean ~ year, ann_means))
+summary(lm(ER_mean ~ year, ann_means))
+
+gpp_trend <- brm(GPP_mean~year, ann_means)
+er_trend <- brm(ER_mean~year, ann_means)
+
+summary(gpp_trend)
+summary(er_trend)
 
 ################################################################################
 # Attempt to model using GAMS:(old code)
