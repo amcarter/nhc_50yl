@@ -4,6 +4,9 @@
 # 2/2022
 library(tidyverse)
 library(brms)
+library(ggpubr)
+library(posterior)
+library(viridis)
 
 # load in the modern dataset:
 dat <- read_csv("data/metabolism/compiled/metabolism_and_drivers.csv")
