@@ -506,7 +506,6 @@ dev.off()
 #     var_e <- matrixStats::rowVars(e)
 #     as.matrix(var_ypred/(var_ypred + var_e))
 # }
-
 draws_fit_ER <- as_draws_array(bmod_ER1)
 ER_pars <- posterior::summarize_draws(draws_fit_ER) %>%
     filter(variable %in% c('b_Intercept', 'b_CBP', 'b_temp.water', 'b_light',
@@ -515,7 +514,7 @@ ER_pars <- posterior::summarize_draws(draws_fit_ER) %>%
     mutate(model = "ER")
 
 pd <- posterior::subset_draws(draws_fit_ER,
-                              variable = c('b_Intercept', 'b_CBP', 'b_temp.water', 'b_light',
+                              variable = c('b_Intercept', 'r_site[CBP,Intercept]', 'b_temp.water', 'b_light',
                                            'b_mean_log_Q', 'b_temp.water:mean_log_Q',
                                            'ar[1]', 'sigma'),
                               draw = 1:2000)
@@ -723,7 +722,7 @@ hindcast <- hall %>%
     right_join(hindcast, by = 'date')
 
 bind_rows(GPP_pars, ER_pars) %>%
-    write_csv('data/timeseries_model_fits/BRMS_hindcast_models_coefficients.csv')
+    write_csv('data/timeseries_model_fits/BRMS_hindcast_models_coefficients2.csv')
 
 ################################################################################
 # Make Figures:
